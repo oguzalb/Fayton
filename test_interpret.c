@@ -37,18 +37,46 @@ void test_interpret_block(char *code, atom_tree_t *tree) {
 }
 
 int main() {
-    static char buffer[] = "a+b+(c*3)";
     atom_tree_t tree;
-    test_interpret_block("a = int(1)\nb = a + 3", &tree);
-    test_interpret_block("for i in range(1, 10):\n    print(i)", &tree);
-    test_interpret_block("def add(a, b):\n    return a + b\nc = add(1,2)", &tree);
-    test_interpret_block("for i in [1, 2, 3, 4]:\n    print(i)", &tree);
-    test_interpret_block("a = {1:5, 2:6, 3:7, 4:8}", &tree);
-    test_interpret_block("a = {1:5, 2:6, 3:7, 4:8}\nfor i in a.keys():\n    print(i)", &tree);
-    test_interpret_block("class Foo(object):\n    def __add__(self, other):\n        return self.value + other\n    value = 10\nfoo = Foo()\nprint(foo+4)", &tree);
-    test_interpret_block("l = [\"one\", \"two\", \"three\", 4]\nfor i in l:\n    print(i)\n", &tree);
-    test_interpret_block("l = [1, 2, 3, 4, 5]\nprint(sum(l))", &tree);
-    test_interpret_block("class MyThread(Thread):\n    def run(self):\n        print(255)\nthread = MyThread()\nthread.run()\n", &tree);
+    test_interpret_block(
+"a = int(1)\n\
+b = a + 3", &tree);
+    test_interpret_block(
+"for i in range(1, 10):\n\
+    print(i)", &tree);
+    test_interpret_block(
+"def add(a, b):\n\
+    return a + b\n\
+c = add(1,2)", &tree);
+    test_interpret_block(
+"for i in [1, 2, 3, 4]:\n\
+    print(i)", &tree);
+    test_interpret_block(
+"a = {1:5, 2:6, 3:7, 4:8}", &tree);
+    test_interpret_block(
+"a = {1:5, 2:6, 3:7, 4:8}\n\
+for i in a.keys():\n\
+    print(i)", &tree);
+    test_interpret_block(
+"class Foo(object):\n\
+    def __add__(self, other):\n\
+        return self.value + other\n\
+    value = 10\n\
+foo = Foo()\n\
+print(foo+4)", &tree);
+    test_interpret_block(
+"l = [\"one\", \"two\", \"three\", 4]\n\
+for i in l:\n\
+    print(i)\n", &tree);
+    test_interpret_block(
+"l = [1, 2, 3, 4, 5]\n\
+print(sum(l))", &tree);
+    test_interpret_block(
+"class MyThread(Thread):\n\
+    def run(self):\n\
+        print(255)\n\
+thread = MyThread()\n\
+thread.run()\n", &tree);
     test_interpret_block("print(1==2)", &tree);
     test_interpret_block(
 "def recsum(n, sum):\n\

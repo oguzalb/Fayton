@@ -32,76 +32,6 @@ char *object_type_name(int type) {
     assert(FALSE);
 }
 
-struct int_type {
-    int ob_ival;
-};
-
-struct list_type {
-    GArray *ob_aval;
-};
-
-struct dict_type {
-    GHashTable *ob_dval;
-};
-
-struct str_type {
-    GString *ob_sval;
-};
-
-struct bool_type {
-    GString *ob_bval;
-};
-
-struct thread_type {
-    GThread *ob_thread;
-};
-
-struct func_type {
-    struct _object *(*ob_func)(struct interpreter_t *, GArray *);
-};
-
-struct userfunc_type {
-    atom_t *ob_userfunc;
-};
-
-struct class_type {
-// TODO CHAIN
-    struct _object *inherits;
-    struct _object *(*ob_func)(struct interpreter_t *, GArray *);
-};
-
-struct listiterator_type {
-    struct _object *ob_ob;
-    int ob_ival;
-};
-
-struct interpreter_t;
-typedef struct _object {
-    int type;
-    struct _object *class;
-    GHashTable *fields;
-    union {
-        struct int_type *int_props;
-        struct list_type *list_props;
-        struct dict_type *dict_props;
-        struct str_type *str_props;
-        struct bool_type *bool_props;
-        struct thread_type *thread_props;
-        struct func_type *func_props;
-        struct class_type *class_props;
-        struct userfunc_type *userfunc_props;
-        struct listiterator_type *listiterator_props;
-    };
-} object_t;
-
-typedef struct _interpreter {
-    int error;
-    object_t *last_accessed;
-    GHashTable *globals;
-    
-} interpreter_t;
-
-
 #define FUNC_STRUCT_TYPE(x) object_t *(*x)(interpreter_t *, GArray *)
 
 void print_var(char*, object_t*);
@@ -401,7 +331,6 @@ gboolean object_equal(gconstpointer a, gconstpointer b) {
     return g_int_equal(&aobj->int_props->ob_ival, &bobj->int_props->ob_ival);
 }
 
-object_t *interpret_block(interpreter_t *, atom_t *, GHashTable *, int);
 object_t *thread_runner(struct thread_data_t *thread_data) {
     printd("Creating the thread\n");
     object_t *run_func = thread_data->func_obj;
@@ -1005,64 +934,4 @@ object_t *interpret_block(interpreter_t *interpreter, atom_t *block, GHashTable 
         if (ret != NULL)
             return ret;
     } while (stmt = stmt->next);
-}
-
-// for mac os
-FILE *fmemopen (void *buf, size_t size, const char *opentype)
-{
-    FILE *f;
-
-    assert(strcmp(opentype, "r") == 0);
-
-    f = tmpfile();
-    fwrite(buf, 1, size, f);
-    rewind(f);
-
-    return f;
-}
-
-void test_interpret_block(char *code, atom_tree_t *tree) {
-    FILE *stream;
-    stream = fmemopen(code, strlen(code), "r");
-    struct t_tokenizer *tokenizer = new_tokenizer();
-    int success = tokenize_stream(stream, tree, tokenizer);
-    assert(tokenizer->error != PARSE_ERROR);
-    tree->root = parse_block(tokenizer, -1);
-    free_tokenizer(tokenizer);
-    assert(tokenizer->error != PARSE_ERROR);
-    char buff[2048];
-    buff[0] = '\0';
-    print_atom(tree->root, buff, 0, FALSE);
-    printf("%s\n", buff);
-    printd("creating interpreter\n", buff);
-    interpreter_t * interpreter = new_interpreter();
-    printd("interpreting\n", buff);
-    interpret_block(interpreter, tree->root, interpreter->globals, 0);
-    assert(interpreter->error != RUN_ERROR);
-    g_hash_table_foreach(interpreter->globals, print_var_each, NULL);
-    free_atom_tree(tree->root);
-}
-
-int main() {
-    static char buffer[] = "a+b+(c*3)";
-    atom_tree_t tree;
-    test_interpret_block("a = int(1)\nb = a + 3", &tree);
-    test_interpret_block("for i in range(1, 10):\n    print(i)", &tree);
-    test_interpret_block("def add(a, b):\n    return a + b\nc = add(1,2)", &tree);
-    test_interpret_block("for i in [1, 2, 3, 4]:\n    print(i)", &tree);
-    test_interpret_block("a = {1:5, 2:6, 3:7, 4:8}", &tree);
-    test_interpret_block("a = {1:5, 2:6, 3:7, 4:8}\nfor i in a.keys():\n    print(i)", &tree);
-    test_interpret_block("class Foo(object):\n    def __add__(self, other):\n        return self.value + other\n    value = 10\nfoo = Foo()\nprint(foo+4)", &tree);
-    test_interpret_block("l = [\"one\", \"two\", \"three\", 4]\nfor i in l:\n    print(i)\n", &tree);
-    test_interpret_block("l = [1, 2, 3, 4, 5]\nprint(sum(l))", &tree);
-    test_interpret_block("class MyThread(Thread):\n    def run(self):\n        print(255)\nthread = MyThread()\nthread.run()\n", &tree);
-    test_interpret_block("print(1==2)", &tree);
-    test_interpret_block(
-"def recsum(n, sum):\n\
-    if n < 1:\n\
-        return sum\n\
-    else:\n\
-        return recsum(n-1, sum+n)\n\
-print(recsum(10, 0))", &tree);
-    return 0;
 }
