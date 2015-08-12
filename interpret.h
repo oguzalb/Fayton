@@ -6,8 +6,22 @@
 #include <string.h>
 #include <assert.h>
 #include <glib.h>
+#include "parse.h"
+
+#define INT_TYPE 1
+#define STR_TYPE 2
+#define CLASS_TYPE 3
+#define FUNC_TYPE 4
+#define LIST_TYPE 5
+#define LISTITERATOR_TYPE 6
+#define USERFUNC_TYPE 7
+#define DICTIONARY_TYPE 8
+#define CUSTOMOBJECT_TYPE 9
+#define THREAD_TYPE 10
+#define BOOL_TYPE 11
 
 #define RUN_ERROR 1
+
 struct int_type {
     int ob_ival;
 };
@@ -25,7 +39,7 @@ struct str_type {
 };
 
 struct bool_type {
-    GString *ob_bval;
+    int ob_bval;
 };
 
 struct thread_type {
@@ -33,7 +47,7 @@ struct thread_type {
 };
 
 struct func_type {
-    struct _object *(*ob_func)(struct interpreter_t *, GArray *);
+    struct _object *(*ob_func)(GArray *);
 };
 
 struct userfunc_type {
@@ -43,7 +57,7 @@ struct userfunc_type {
 struct class_type {
 // TODO CHAIN
     struct _object *inherits;
-    struct _object *(*ob_func)(struct interpreter_t *, GArray *);
+    struct _object *(*ob_func)(GArray *);
 };
 
 struct listiterator_type {
@@ -69,14 +83,33 @@ typedef struct _object {
     };
 } object_t;
 
-typedef struct _interpreter {
+struct _interpreter {
     int error;
     object_t *last_accessed;
     GHashTable *globals;
     
-} interpreter_t;
+} interpreter;
 
 void print_var_each(gpointer, gpointer, gpointer);
-object_t *interpret_block(interpreter_t *, atom_t *, GHashTable *, int);
-interpreter_t * new_interpreter();
+object_t *interpret_block(atom_t *, GHashTable *, int);
+void init_interpreter();
+gboolean object_equal(gconstpointer, gconstpointer);
+guint object_hash(gconstpointer);
+object_t *object_equals(GArray *);
+object_t *new_func(object_t *(*)(GArray *));
+void object_add_field(object_t *, char*, object_t *);
+object_t *object_get_field(object_t *, char*);
+void register_global(char*, object_t *);
+object_t *get_global(char*);
+object_t *get_global_no_check(char*);
+object_t *new_class(char*);
+object_t *new_object(int);
+void print_var(char*, object_t*);
+
+#include "int.h"
+#include "bool.h"
+#include "str.h"
+#include "list.h"
+#include "dict.h"
+#include "thread.h"
 #endif

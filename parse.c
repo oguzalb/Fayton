@@ -119,7 +119,7 @@ char *atom_type_name(int type) {
     assert(FALSE);
 }
 
-atom_t *new_atom(void *value, int type) {
+atom_t *new_atom(char *value, int type) {
     atom_t *atom = (atom_t *) malloc(sizeof(atom_t));
     atom->type = type;
     atom->value = value;
@@ -136,7 +136,7 @@ atom_t *add_next_atom(atom_t *atom, void *value, int type) {
 }
 
 atom_t *switch_children_atom(atom_t *atom) {
-printd("switching %x %s\n", atom, atom->value);
+printd("switching %p %s\n", atom, atom->value);
     atom_t *left = atom->child;
     atom->child = atom->child->next;
     atom->child->next = left;
@@ -144,7 +144,7 @@ printd("switching %x %s\n", atom, atom->value);
 }
 
 atom_t *add_child_atom(atom_t *atom, atom_t *new_atom) {
-printd("adding %x %s to %x %s\n", new_atom, new_atom->value, atom, atom->value);
+printd("adding %p %s to %p %s\n", new_atom, new_atom->value, atom, atom->value);
     if (atom->child == NULL)
         atom->child = new_atom;
     else {
@@ -891,13 +891,13 @@ atom_t *parse_if_else_if(struct t_tokenizer *tokenizer, int current_indent) {
         return NULL;
     }
     tokenizer->iter++;
-    struct atom_t *block = parse_block(tokenizer, current_indent);
+    atom_t *block = parse_block(tokenizer, current_indent);
     return block;
 }
 
 atom_t *parse_if(struct t_tokenizer *tokenizer, int current_indent) {
     atom_t *if_clause = new_atom(strdup("if"), A_IF);
-    struct atom_t *expr = parse_comp(tokenizer);
+    atom_t *expr = parse_comp(tokenizer);
     if (expr == NULL)
         return NULL;
     atom_t *block = parse_if_else_if(tokenizer, current_indent);
@@ -932,7 +932,7 @@ atom_t *parse_if(struct t_tokenizer *tokenizer, int current_indent) {
                 return NULL;
             add_child_atom(if_clause, block);
         } else {
-            struct atom_t *expr = parse_comp(tokenizer);
+            atom_t *expr = parse_comp(tokenizer);
             if (expr == NULL)
                 return NULL;
             atom_t *block = parse_if_else_if(tokenizer, current_indent);
@@ -1170,7 +1170,7 @@ void free_tokenizer(struct t_tokenizer *tokenizer) {
     tokenizer->iter = tokenizer->tokens;
     while (*(tokenizer->iter) != NULL) {
         struct t_token *token = *tokenizer->iter;
-        printd("Freeing token %x", token->value);
+        printd("Freeing token %p", token->value);
         print_token(token);
         free(token->value);
         free(token);

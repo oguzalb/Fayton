@@ -21,18 +21,18 @@ void test_interpret_block(char *code, atom_tree_t *tree) {
     int success = tokenize_stream(stream, tree, tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
     tree->root = parse_block(tokenizer, -1);
-    free_tokenizer(tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
+    free_tokenizer(tokenizer);
     char buff[2048];
     buff[0] = '\0';
     print_atom(tree->root, buff, 0, FALSE);
     printf("%s\n", buff);
-    printd("creating interpreter\n", buff);
-    interpreter_t * interpreter = new_interpreter();
+    printd("initializing interpreter\n", buff);
+    init_interpreter();
     printd("interpreting\n", buff);
-    interpret_block(interpreter, tree->root, interpreter->globals, 0);
-    assert(interpreter->error != RUN_ERROR);
-    g_hash_table_foreach(interpreter->globals, print_var_each, NULL);
+    interpret_block(tree->root, interpreter.globals, 0);
+    assert(interpreter.error != RUN_ERROR);
+    g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
     free_atom_tree(tree->root);
 }
 

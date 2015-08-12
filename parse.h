@@ -50,7 +50,7 @@
 #define A_IF 32
 
 typedef struct _atom_t {
-    void *value;
+    char *value;
     long type;
     struct _atom_t *child;
     struct _atom_t *next;
@@ -67,7 +67,7 @@ struct t_token {
 struct t_tokenizer {
     struct t_token** iter;
     struct t_token** tokens;
-    struct GArray *contexts;
+    GArray *contexts;
     int error;
 };
 
