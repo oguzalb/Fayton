@@ -19,6 +19,7 @@
 #define CUSTOMOBJECT_TYPE 9
 #define THREAD_TYPE 10
 #define BOOL_TYPE 11
+#define NONE_TYPE 12
 
 #define RUN_ERROR 1
 
@@ -108,6 +109,7 @@ void print_var(char*, object_t*);
 
 #include "int.h"
 #include "bool.h"
+#include "none.h"
 #include "str.h"
 #include "list.h"
 #include "dict.h"

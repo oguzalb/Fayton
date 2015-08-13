@@ -329,6 +329,8 @@ atom_t *parse_var(struct t_tokenizer *tokenizer, atom_t *prev_arg) {
 
 atom_t *parse_return(struct t_tokenizer *tokenizer) {
     atom_t *ret = new_atom(strdup("return"), A_RETURN);
+    if ((*tokenizer->iter)->type == T_EOL)
+        return ret;
     add_child_atom(ret, parse_comp(tokenizer));
     return ret;
 }
@@ -1131,6 +1133,7 @@ int tokenize_stream(FILE *fp, atom_tree_t* root, struct t_tokenizer *tokenizer) 
             int *indent_count_p = malloc(sizeof(int));
             *indent_count_p = indent_count;
             struct t_token * token = new_token();
+            // (:
             token->value = indent_count_p;
             token->type = T_INDENT;
             *new_tokens_iter = token;

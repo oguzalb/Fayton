@@ -12,6 +12,8 @@ char *object_type_name(int type) {
         case 8: return "DICTIONARY";
         case 9: return "CUSTOMOBJECT";
         case 10: return "THREAD";
+        case 11: return "BOOL";
+        case 12: return "NONE";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -37,6 +39,8 @@ void print_var(char* name, object_t* obj) {
         printd("str %s\n", obj->str_props->ob_sval->str);
     } else if (obj->type == USERFUNC_TYPE) {
         printd("userfunc %s\n", name);
+    } else if (obj->type == NONE_TYPE) {
+        printd("None\n");
     } else if (obj->type == DICTIONARY_TYPE) {
         g_hash_table_foreach(obj->dict_props->ob_dval, print_pair_each, NULL);
     } if (obj->type == FUNC_TYPE) {
@@ -269,8 +273,10 @@ object_t *print_func(GArray *args) {
         printf("%s\n", var->str_props->ob_sval->str);
     } else if (var->type == BOOL_TYPE) {
         printf("%s\n", var->bool_props->ob_bval ? "True":"False");
+    } else if (var->type == NONE_TYPE) {
+        printf("None\n");
     } else {
-        print_var("Print got!?!", var);
+        printf("Print got %d!?!", var->type);
         assert(FALSE);
     }
 }
@@ -287,6 +293,7 @@ void init_interpreter() {
     init_int();
     init_str();
     init_bool();
+    init_none();
 
     register_global(strdup("range"), new_func(range_func));
     register_global(strdup("sum"), new_func(sum_func));
@@ -637,7 +644,12 @@ printd("A_IF\n");
         register_global(strdup(class_name->value), class);
         // TODO inherits CHAIN
         if (inherits != NULL) {
-            object_t *parent_class = get_global(inherits->value);
+            object_t *parent_class = get_var(context, inherits->value);
+            if (parent_class == NULL) {
+                interpreter.error = RUN_ERROR;
+                printf("Class does not exist: %s\n", inherits->value);
+                return NULL;
+            }
             class->class_props->inherits = parent_class;
         } else
             class->class_props->inherits = NULL;
@@ -646,8 +658,7 @@ printd("A_IF\n");
         if (stmt->child)
             return interpret_expr(stmt->child, context, current_indent);
         else
-            // TODO will implement NoneType, this won't work for now
-            return NULL;
+            return new_none_internal();
     }
     return NULL;
 }
@@ -669,4 +680,5 @@ object_t *interpret_block(atom_t *block, GHashTable *context, int current_indent
         if (ret != NULL)
             return ret;
     } while (stmt = stmt->next);
+    return new_none_internal();
 }
