@@ -27,7 +27,14 @@ char *read_input() {
         input = extended_input;
         strncat(input, buff, 1023);
         // i know this is slow, but no need for optimization since it can't get faster than user's typing :)
-        if (input[strlen(input)-1] == '\n' && strncmp(buff, "class ", 6) && strncmp(buff, "def ", 4) && buff[0] != ' ')
+        if (input[strlen(input)-1] == '\n'
+            && strncmp(buff, "class ", 6)
+            && strncmp(buff, "def ", 4)
+            // needs to get improved
+            && strncmp(buff, "if", 2)
+            && strncmp(buff, "elif", 4)
+            && strncmp(buff, "else", 4)
+            && buff[0] != ' ')
             break;
         buff[0]='\0';
     }
@@ -48,11 +55,20 @@ int main() {
         stream = fmemopen(input, strlen(input), "r");
         struct t_tokenizer *tokenizer = new_tokenizer();
         int success = tokenize_stream(stream, tree, tokenizer);
-        assert(tokenizer->error != PARSE_ERROR);
+        if (tokenizer->error == PARSE_ERROR) {
+            printf("Syntax error at line:%d\n", tokenizer->current_line);
+            free_tokenizer(tokenizer);
+            free(input);
+            continue;
+        }
         // fclose(stream);
         free(input);
         tree->root = parse_block(tokenizer, -1);
-        assert(tokenizer->error != PARSE_ERROR);
+        if (tokenizer->error == PARSE_ERROR) {
+            printf("Syntax error at line:%d %s\n", tokenizer->current_line, (*tokenizer->iter)==NULL?"":(*tokenizer->iter)->value);
+            free_tokenizer(tokenizer);
+            continue;
+        }
         free_tokenizer(tokenizer);
         // this is for showing what we get as the ast tree, we won't have this when it is finished
         char buff[10000];
@@ -61,7 +77,6 @@ int main() {
         printf("%s\n", buff);
         printd("interpreting\n", buff);
         interpret_block(tree->root, interpreter.globals, 0);
-        assert(interpreter.error != RUN_ERROR);
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
     }
     atom_tree_t *tree;

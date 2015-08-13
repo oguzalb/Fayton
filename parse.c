@@ -190,7 +190,7 @@ int tokenize_one_char(char c, int cur_type, char expect_char, int expect_type) {
         return cur_type;
 }
 
-int token(char *buffer, FILE *fp) {
+int token(struct t_tokenizer *tokenizer, char *buffer, FILE *fp) {
     int i = 0;
     char c;
     int type = 0;
@@ -273,6 +273,9 @@ int token(char *buffer, FILE *fp) {
             }
             buffer[i++] = c;
             buffer[i] = '\0';
+            if (cur_type == T_EOL) {
+                tokenizer->current_line++;
+            }
             break;
         } else if (cur_type != T_INITIAL) {
             fseek(fp, -1, SEEK_CUR);
@@ -848,6 +851,8 @@ atom_t * parse_block(struct t_tokenizer *tokenizer, int previous_indent) {
     atom_t *block = new_atom(strdup("block"), A_BLOCK);
     int start_count = 0;
     struct t_token *indent = *tokenizer->iter;
+    if (indent == NULL)
+        return block;
     if (indent->type == T_INDENT) {
 printd("INDENT FOUND start\n");
         start_count = *indent->value;
@@ -1092,14 +1097,17 @@ int tokenize_stream(FILE *fp, atom_tree_t* root, struct t_tokenizer *tokenizer) 
 
     int i = 0;
     tokenizer->tokens = malloc(sizeof(struct t_token *) * 30);
+    tokenizer->current_line = 0;
+
     struct t_token **token_iter = tokenizer->tokens;
-    while (PARSE_ERROR != (type = token(buffer, fp)) && type != T_INITIAL) {
+    while (PARSE_ERROR != (type = token(tokenizer, buffer, fp)) && type != T_INITIAL) {
         printd("%s\n", buffer);
         tokenizer->tokens = realloc(tokenizer->tokens, sizeof(struct t_token *) * (i + 2));
         assert(tokenizer->tokens);
         struct t_token *token = new_token();
         token->value = strdup(buffer);
         token->type = type;
+        token->line = tokenizer->current_line;
         tokenizer->tokens[i] = token;
         i++;
     }

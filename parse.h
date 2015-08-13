@@ -63,10 +63,13 @@ typedef struct {
 struct t_token {
     char* value;
     int type;
+    int line;
 };
+
 struct t_tokenizer {
     struct t_token** iter;
     struct t_token** tokens;
+    int current_line;
     GArray *contexts;
     int error;
 };

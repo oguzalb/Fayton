@@ -318,7 +318,10 @@ object_t *lookup_var(GHashTable *context, char* name) {
         printd("context\n");
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
     }
-    assert(object != NULL);
+    if (object == NULL) {
+        interpreter.error = RUN_ERROR;
+        printd("NameError %s not found\n", name);
+    }
     return object;
 }
 
@@ -357,8 +360,6 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
             if (param->type == A_VAR) {
                 object_t *value = lookup_var(context, param->value);
                 if (value == NULL) {
-                    printf("var not found %s\n", param->value);
-                    interpreter.error = RUN_ERROR;
                     return NULL;
                 }
                 printd("ADDING ARGUMENT %s\n", param->value);
@@ -535,8 +536,6 @@ object_t *interpret_expr(atom_t *expr, GHashTable *context, int current_indent) 
             printd("%s\n", expr->child->value);
             object = lookup_var(context, expr->child->value);
             if (object == NULL) {
-                interpreter.error = RUN_ERROR;
-                printd("object %s could not be found in context or globals\n", expr->child->value);
                 return NULL;
             }
             print_var("object", object);
@@ -672,6 +671,8 @@ object_t *interpret_block(atom_t *block, GHashTable *context, int current_indent
         return NULL;
     }
     atom_t *stmt = block->child;
+    if (stmt == NULL)
+        return new_none_internal();
     object_t *last_result;
     do {
         object_t *ret = interpret_stmt(stmt, context, current_indent);
