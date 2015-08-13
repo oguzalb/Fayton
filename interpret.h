@@ -87,7 +87,7 @@ struct _interpreter {
     int error;
     object_t *last_accessed;
     GHashTable *globals;
-    
+
 } interpreter;
 
 void print_var_each(gpointer, gpointer, gpointer);

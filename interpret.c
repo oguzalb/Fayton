@@ -36,7 +36,7 @@ void print_var(char* name, object_t* obj) {
     } else if (obj->type == STR_TYPE) {
         printd("str %s\n", obj->str_props->ob_sval->str);
     } else if (obj->type == USERFUNC_TYPE) {
-        printd("user func %s\n", name);
+        printd("userfunc %s\n", name);
     } else if (obj->type == DICTIONARY_TYPE) {
         g_hash_table_foreach(obj->dict_props->ob_dval, print_pair_each, NULL);
     } if (obj->type == FUNC_TYPE) {
@@ -128,7 +128,8 @@ object_t *get_var(GHashTable *context, char *name) {
     var = g_hash_table_lookup(interpreter.globals, (void *)name);
     if (var == NULL) {
         interpreter.error = RUN_ERROR;
-        printf("Global not found %s\n", name);
+        g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
+        printf("Global not found |%s|\n", name);
         return NULL;
     }
     return var;
@@ -138,7 +139,8 @@ object_t *get_global(char*name) {
     object_t *cls = g_hash_table_lookup(interpreter.globals, name);
     if (cls == NULL) {
         interpreter.error = RUN_ERROR;
-        printf("Global not found %s\n", name);
+        g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
+        printf("Global not found |%s|\n", name);
         return NULL;
     }
     return cls;
