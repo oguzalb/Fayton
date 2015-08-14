@@ -357,34 +357,13 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
             g_array_append_val(args, interpreter.last_accessed);
         }
         while (param) {
-            if (param->type == A_VAR) {
-                object_t *value = lookup_var(context, param->value);
-                if (value == NULL) {
-                    return NULL;
-                }
-                printd("ADDING ARGUMENT %s\n", param->value);
-                print_var("", value);
-                g_array_append_val(args, value);
-            } else if (param->type == A_INTEGER) {
-                object_t * int_val = new_int_internal(atoi(param->value));
-                printd("ADDING ARGUMENT %s\n", param->value);
-                g_array_append_val(args, int_val);
-                printd("ADDED ARGUMENT\n");
-            } else if (param->type == A_FUNCCALL) {
-                object_t *param_object = interpret_funccall(param, context, current_indent);
-                if (interpreter.error == RUN_ERROR)
-                    return NULL;
-                if (param_object == NULL) {
-                    printf("Param expr returned NULL!?!\n");
-                    interpreter.error = RUN_ERROR;
-                    return NULL;
-                }
-                g_array_append_val(args, param_object);
-            } else {
-                interpreter.error = RUN_ERROR;
-                printf("TYPE NOT PARAM %s\n", atom_type_name(param->type));
+            object_t *value = interpret_expr(param, context, current_indent);
+            if (interpreter.error != NULL) {
                 return NULL;
             }
+            printd("ADDING ARGUMENT %s\n", param->value);
+            print_var("", value);
+            g_array_append_val(args, value);
             param = param->next;
         }
     } else if (func->type == USERFUNC_TYPE) {
@@ -404,29 +383,11 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
                 interpreter.error = RUN_ERROR;
                 printd("More parameter passed than needed next: %s\n", param->value);
                 return NULL;}
-            if (param->type == A_VAR) {
-                printd("ADDING ARGUMENT %s\n", param->value);
-                g_hash_table_insert(sub_context, param_name->value, param->value);
-            } else if (param->type == A_INTEGER) {
-                object_t * int_val = new_int_internal(atoi(param->value));
-                printd("ADDING ARGUMENT %s\n", param->value);
-                g_hash_table_insert(sub_context, param_name->value, int_val);
-                printd("ADDED ARGUMENT\n");
-            } else if (param->type == A_FUNCCALL) {
-                object_t *param_object = interpret_funccall(param, context, current_indent);
-                if (interpreter.error == RUN_ERROR)
-                    return NULL;
-                if (param_object == NULL) {
-                    printf("Param expr returned NULL!?!\n");
-                    interpreter.error = RUN_ERROR;
-                    return NULL;
-                }
-                g_hash_table_insert(sub_context, param_name->value, param_object);
-            } else {
-                interpreter.error = RUN_ERROR;
-                printf("TYPE NOT PARAM %s\n", atom_type_name(param->type));
+            object_t *value = interpret_expr(param, context, current_indent);
+            if (interpreter.error != NULL) {
                 return NULL;
             }
+            g_hash_table_insert(sub_context, param_name->value, value);
             param = param->next;
             param_name = param_name->next;
             // TODO check if they match

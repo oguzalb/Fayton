@@ -27,7 +27,17 @@ object_t *list_append(GArray *args) {
         return NULL;
     }
     g_array_append_val(list->list_props->ob_aval, item);
-    return item;
+    return new_none_internal();
+}
+
+object_t *list_extend(GArray *args) {
+    object_t *list = g_array_index(args, object_t*, 0);
+    object_t *list2 = g_array_index(args, object_t*, 0);
+    if (list->type != LIST_TYPE) {
+        for (int i=0; g_array_index(args, object_t*, i) != NULL; i++)
+            g_array_append_val(args, g_array_index(args, object_t*, i));
+    }
+    return new_none_internal();
 }
 
 object_t *list_append_internal(object_t *list, object_t *item) {
@@ -51,7 +61,7 @@ object_t *new_listiterator_internal(object_t *list) {
 object_t *new_list(GArray *args) {
     // TODO args check
     object_t *list;
-    if (g_array_get_element_size(args) == 1)
+    if (args != NULL && args->len == 1)
         list = g_array_index(args, object_t*, 0);
     else
         list = new_object(LIST_TYPE);
@@ -71,5 +81,7 @@ void init_list() {
     object_t *list_class = new_class(strdup("list"));
     list_class->class_props->ob_func = new_list;
     object_add_field(list_class, "__iter__", new_func(list_iter_func));
+    object_add_field(list_class, "append", new_func(list_append));
+    object_add_field(list_class, "extend", new_func(list_extend));
     register_global(strdup("list"), list_class);
 }

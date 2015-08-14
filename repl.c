@@ -30,10 +30,11 @@ char *read_input() {
         if (input[strlen(input)-1] == '\n'
             && strncmp(buff, "class ", 6)
             && strncmp(buff, "def ", 4)
+            && strncmp(buff, "for ", 4)
             // needs to get improved
-            && strncmp(buff, "if", 2)
-            && strncmp(buff, "elif", 4)
-            && strncmp(buff, "else", 4)
+            && strncmp(buff, "if ", 3)
+            && strncmp(buff, "elif ", 5)
+            && strncmp(buff, "else ", 5)
             && buff[0] != ' ')
             break;
         buff[0]='\0';
