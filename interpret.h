@@ -113,6 +113,7 @@ object_t *new_class(char*);
 object_t *new_object(int);
 void print_var(char*, object_t*);
 
+#include "types/object.h"
 #include "types/int.h"
 #include "types/bool.h"
 #include "types/none.h"
