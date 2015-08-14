@@ -48,6 +48,7 @@
 #define A_SHIFTL 30
 #define A_STRING 31
 #define A_IF 32
+#define A_SLICE 33
 
 typedef struct _atom_t {
     char *value;
