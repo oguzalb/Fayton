@@ -184,11 +184,6 @@ void print_token(struct t_token *token) {
         printd("TOKEN %s, %s\n", token->value, token_type_name(token->type));
 }
 
-
-int tokenize_one_char(char c, int cur_type, char expect_char, int expect_type) {
-        return cur_type;
-}
-
 int token(struct t_tokenizer *tokenizer, char *buffer, FILE *fp) {
     int i = 0;
     char c;
@@ -293,7 +288,7 @@ atom_t *parse_var(struct t_tokenizer *tokenizer, atom_t *prev_arg) {
     if (prev_arg == NULL) {
         if (token == NULL || token->type != T_IDENTIFIER) {
             tokenizer->error = PARSE_ERROR;
-                printf("PARSE_VAR PASS_SPACE PARSE ERROR 1\n", token_type_name(token->type));
+            printf("PARSE_VAR PASS_SPACE PARSE ERROR 1\n", token_type_name(token->type));
             return NULL;
         }
         var = new_atom(strdup(token->value), A_VAR);
@@ -304,23 +299,28 @@ atom_t *parse_var(struct t_tokenizer *tokenizer, atom_t *prev_arg) {
         return var;
     }
     if (tokenizer->error == PARSE_ERROR) {
+        if (var != NULL)
+            free_atom_tree(var);
         return NULL;
     }
     tokenizer->iter++;
     token = *tokenizer->iter;
-    atom_t *sec_var  = NULL;
     if (token == NULL || token->type != T_IDENTIFIER) {
         tokenizer->error = PARSE_ERROR;
         printf("PARSE_VAR PASS_SPACE PARSE ERROR 2\n");
+        if (var != NULL)
+            free_atom_tree(var);
         return NULL;
     }
-    sec_var = new_atom(strdup(token->value), A_VAR);
+    atom_t *sec_var = new_atom(strdup(token->value), A_VAR);
     tokenizer->iter++;
     atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
     if (prev_arg == NULL) {
         add_child_atom(accessor, var);
         add_child_atom(accessor, sec_var);
         atom_t *right = parse_var(tokenizer, accessor);
+        if (tokenizer->error == PARSE_ERROR)
+            return NULL;
         return right;
     } else {
         add_child_atom(accessor, prev_arg);
@@ -333,7 +333,10 @@ atom_t *parse_return(struct t_tokenizer *tokenizer) {
     atom_t *ret = new_atom(strdup("return"), A_RETURN);
     if ((*tokenizer->iter)->type == T_EOL)
         return ret;
-    add_child_atom(ret, parse_comp(tokenizer));
+    atom_t *val = parse_comp(tokenizer);
+    if (tokenizer->error == PARSE_ERROR)
+        return NULL;
+    add_child_atom(ret, val);
     return ret;
 }
 
@@ -351,9 +354,9 @@ atom_t *parse_callparams(struct t_tokenizer *tokenizer) {
         return params;
 // TODO expr
     atom_t *first_arg = parse_comp(tokenizer);
-    add_child_atom(params, first_arg);
     if (first_arg == NULL)
         return NULL;
+    add_child_atom(params, first_arg);
     atom_t *prev_arg = first_arg;
     while (TRUE) {
         token = *tokenizer->iter;
@@ -364,10 +367,13 @@ printd("%s++\n", token->value);
         if (token->type != T_COMMA) {
 printf("PARSE_CALLPARAMS COMMA ERR %s %s\n", token->value, token_type_name(token->type));
             tokenizer->error = PARSE_ERROR;
-            return params;
+            free_atom_tree(params);
+            return NULL;
         }
         tokenizer->iter++;
         atom_t *arg = parse_comp(tokenizer);
+        if (tokenizer->error == PARSE_ERROR)
+            return NULL;
         prev_arg->next = arg;
         prev_arg = arg;
     }
@@ -395,10 +401,13 @@ printd("PARSE_LIST START\n");
         if (token->type != T_COMMA) {
             printf("PARSE_LIST COMMA ERROR\n");
             tokenizer->error = PARSE_ERROR;
-            return list;
+            free_atom_tree(list);
+            return NULL;
         }
         tokenizer->iter++;
         atom_t *arg = parse_comp(tokenizer);
+        if (tokenizer->error == PARSE_ERROR)
+            return NULL;
         prev_arg->next = arg;
         prev_arg = arg;
     }
@@ -415,15 +424,22 @@ printd("PARSE_DICTIONARY START\n");
     tokenizer->iter++;
     atom_t *dictionary = new_atom(strdup("dict"), A_DICTIONARY);
     atom_t *key = parse_comp(tokenizer);
+    if (tokenizer->error == PARSE_ERROR)
+        return NULL;
+    add_child_atom(dictionary, key);
     token = *tokenizer->iter;
     if (token->type != T_COLUMN) {
         printf("PARSE_DICTIONARY COLUMN ERROR\n");
         tokenizer->error = PARSE_ERROR;
-        return dictionary;
+        free_atom_tree(dictionary);
+        return NULL;
     }
     tokenizer->iter++;
     atom_t *value = parse_comp(tokenizer);
-    add_child_atom(dictionary, key);
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(dictionary);
+        return NULL;
+    }
     add_child_atom(dictionary, value);
     atom_t *prev_arg = dictionary->child->next;
     while (TRUE) {
@@ -435,20 +451,30 @@ printd("PARSE_DICTIONARY START\n");
         if (token->type != T_COMMA) {
             printf("PARSE_DICTIONARY COMMA ERROR\n");
             tokenizer->error = PARSE_ERROR;
-            return dictionary;
+            free_atom_tree(dictionary);
+            return NULL;
         }
         tokenizer->iter++;
         atom_t *key = parse_comp(tokenizer);
+        if (tokenizer->error == PARSE_ERROR) {
+            free_atom_tree(dictionary);
+            return NULL;
+        }
         prev_arg->next = key;
         prev_arg = key;
         token = *tokenizer->iter;
         if (token->type != T_COLUMN) {
             printf("PARSE_DICTIONARY COLUMN2 ERROR\n");
             tokenizer->error = PARSE_ERROR;
-            return dictionary;
+            free_atom_tree(dictionary);
+            return NULL;
         }
         tokenizer->iter++;
         atom_t *value = parse_comp(tokenizer);
+        if (tokenizer->error == PARSE_ERROR) {
+            free_atom_tree(dictionary);
+            return NULL;
+        }
         prev_arg->next = value;
         prev_arg = value;
     }
@@ -457,11 +483,15 @@ printd("PARSE_DICTIONARY START\n");
 atom_t *parse_call(struct t_tokenizer *tokenizer, atom_t *first_arg) {
 printd("PARSE_CALL\n");
     atom_t *callparams = parse_callparams(tokenizer);
+    if (tokenizer->error == PARSE_ERROR)
+        return NULL;
 printd("PARSE_CALL_end\n");
     struct t_token *cphar = *tokenizer->iter;
     if (cphar->type != T_CPHAR) {
 printf("PARSE_CALL CPHAR ERR\n");
         tokenizer->error == PARSE_ERROR;
+        if (callparams)
+            free_atom_tree(callparams);
         return NULL;
     }
     tokenizer->iter++;
@@ -506,6 +536,7 @@ printd("PARSE_ATOM START\n");
         atom_t *phar = parse_comp(tokenizer);
         if ((*tokenizer->iter)->type != T_CPHAR) {
             tokenizer->error = PARSE_ERROR;
+            printf("PARSE_ATOM ERROR NO CPHAR %s\n", (*tokenizer->iter)->value);
             return NULL;
         }
         tokenizer->iter++;
@@ -527,6 +558,7 @@ atom_t *parse_trailer(struct t_tokenizer *tokenizer) {
         token = *tokenizer->iter;
         if (token->type != T_IDENTIFIER) {
             printf("PARSE TRAILER NOT IDENTIFIER %s\n", token->value);
+            free_atom_tree(accessor);
             tokenizer->error = PARSE_ERROR;
             return NULL;
         }
@@ -537,6 +569,8 @@ atom_t *parse_trailer(struct t_tokenizer *tokenizer) {
     } else if (token->type == T_OPHAR) {
         tokenizer->iter++;
         atom_t *callparams = parse_callparams(tokenizer);
+        if (tokenizer->error == PARSE_ERROR)
+            return NULL;
         atom_t *funccall = new_atom(strdup("()call"), A_FUNCCALL);
         if (callparams)
             add_child_atom(funccall, callparams);
@@ -554,6 +588,10 @@ atom_t *parse_power(struct t_tokenizer *tokenizer) {
         return NULL;
     atom_t *trailer = NULL;
     atom_t *top_trailer = parse_trailer(tokenizer);
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(atom);
+        return NULL;
+    }
     if (top_trailer == NULL)
         return atom;
     add_child_atom(top_trailer, atom);
@@ -561,6 +599,7 @@ atom_t *parse_power(struct t_tokenizer *tokenizer) {
     while (trailer = parse_trailer(tokenizer)) {
         if (tokenizer->error == PARSE_ERROR) {
             printf("PARSE_POWER ERROR\n");
+            free_atom_tree(top_trailer);
             return NULL;
         }
         if (trailer->type == A_ACCESSOR) {
@@ -578,6 +617,8 @@ atom_t *parse_power(struct t_tokenizer *tokenizer) {
 
 atom_t *parse_term(struct t_tokenizer *tokenizer) {
     atom_t *power = parse_power(tokenizer);
+    if (tokenizer->error == PARSE_ERROR)
+        return NULL;
     struct t_token *token;
     atom_t *top_muldiv = NULL;
 token = *tokenizer->iter;
@@ -585,6 +626,10 @@ token = *tokenizer->iter;
         atom_t *muldiv = new_atom(strdup("()call"), A_FUNCCALL);
         tokenizer->iter++;
         atom_t *sec_power = parse_power(tokenizer);
+        if (tokenizer->error == PARSE_ERROR) {
+            free_atom_tree(top_muldiv != NULL? top_muldiv:power);
+            return NULL;
+        }
         if (top_muldiv == NULL) {
             atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
             add_child_atom(accessor, power);
@@ -606,12 +651,18 @@ token = *tokenizer->iter;
 
 atom_t *parse_arith(struct t_tokenizer *tokenizer) {
     atom_t *term = parse_term(tokenizer);
+    if (tokenizer->error == PARSE_ERROR)
+        return NULL;
     struct t_token *token;
     atom_t *top_arith = NULL;
     while ((token = *tokenizer->iter)!= NULL && (token->type == T_PLUS || token->type == T_MINUS)) {
         atom_t *arith = new_atom(strdup("()call"), A_FUNCCALL);
         tokenizer->iter++;
         atom_t *sec_term = parse_term(tokenizer);
+        if (tokenizer->error == PARSE_ERROR) {
+            free_atom_tree(top_arith != NULL? top_arith:term);
+            return NULL;
+        }
         if (top_arith == NULL) {
             atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
             add_child_atom(accessor, term);
@@ -633,12 +684,18 @@ atom_t *parse_arith(struct t_tokenizer *tokenizer) {
 
 atom_t *parse_shift(struct t_tokenizer *tokenizer) {
     atom_t *arith = parse_arith(tokenizer);
+    if (tokenizer->error == PARSE_ERROR)
+        return NULL;
     struct t_token *token;
     atom_t *top_shift = NULL;
     while ((token = *tokenizer->iter)!= NULL && (token->type == T_RSHIFT || token->type == T_LSHIFT)) {
         atom_t *shift = new_atom(strdup("()call"), A_FUNCCALL);
         tokenizer->iter++;
         atom_t *sec_arith = parse_arith(tokenizer);
+        if (tokenizer->error == PARSE_ERROR) {
+            free_atom_tree(top_shift != NULL? top_shift:arith);
+            return NULL;
+        }
         if (top_shift == NULL) {
             atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
             add_child_atom(accessor, arith);
@@ -660,12 +717,16 @@ atom_t *parse_shift(struct t_tokenizer *tokenizer) {
 
 atom_t *parse_expr(struct t_tokenizer *tokenizer) {
     atom_t *expr = parse_shift(tokenizer);
+    if (tokenizer->error == PARSE_ERROR)
+        return NULL;
     printd("PARSE_EXPR_RETURNS atom: %s:\n", expr?expr->value:"__");
     return expr;
 }
 
 atom_t *parse_comp(struct t_tokenizer *tokenizer) {
     atom_t *shift = parse_shift(tokenizer);
+    if (tokenizer->error == PARSE_ERROR)
+        return NULL;
     struct t_token *token;
     atom_t *top_comp = NULL;
     while ((token = *tokenizer->iter)!= NULL && (token->type == T_GT || token->type == T_LT || token->type == T_EQUALSEQUALS)) {
@@ -676,6 +737,10 @@ char buff[1024];
         atom_t *equals_call = new_atom(strdup("()call"), A_FUNCCALL);
         atom_t *comp = new_atom(strdup("()call"), A_FUNCCALL);
         atom_t *sec_shift = parse_shift(tokenizer);
+        if (tokenizer->error == PARSE_ERROR) {
+            free_atom_tree(top_comp != NULL? top_comp:shift);
+            return NULL;
+        }
         atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
         if (top_comp == NULL)
             add_child_atom(accessor, shift);
@@ -706,6 +771,7 @@ atom_t *parse_params(struct t_tokenizer *tokenizer) {
     struct t_token * ophar = *tokenizer->iter;
     if (ophar == NULL || ophar->type != T_OPHAR) {
         tokenizer->error = PARSE_ERROR;
+        free_atom_tree(params);
         printf("PARSE_PARAMS OPHAR ERR\n");
         return NULL;
     }
@@ -714,6 +780,7 @@ atom_t *parse_params(struct t_tokenizer *tokenizer) {
     while((token = *(tokenizer->iter)) && token->type != T_CPHAR) {
         if (token == NULL || token->type != T_IDENTIFIER) {
             tokenizer->error = PARSE_ERROR;
+            free_atom_tree(params);
             printf("PARSE_PARAMS IDENTIRIER ERR\n");
             return NULL;
         }
@@ -749,6 +816,7 @@ atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
     struct t_token *column = *tokenizer->iter;
     if (column == NULL || column->type != T_COLUMN) {
         printf("PARSE_FUNC COLUMN ERR\n");
+        free_atom_tree(params);
         tokenizer->error = PARSE_ERROR;
         return NULL;
     }
@@ -756,12 +824,22 @@ atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
     struct t_token *eol = *tokenizer->iter;
     if (eol == NULL || eol->type != T_EOL) {
         printf("PARSE_FUNC EOL ERR\n");
+        free_atom_tree(params);
         tokenizer->error = PARSE_ERROR;
         return NULL;
     }
     tokenizer->iter++;
     atom_t *funcdef = new_atom(strdup(func_name->value), A_FUNCDEF);
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(params);
+        return NULL;
+    }
     atom_t *block = parse_block(tokenizer, current_indent);
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(params);
+        free_atom_tree(funcdef);
+        return NULL;
+    }
     add_child_atom(funcdef, params);
     add_child_atom(funcdef, block);
     return funcdef;
@@ -798,6 +876,8 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
     } else {
         struct t_token **prev_iter = tokenizer->iter;
         atom_t *var = parse_var(tokenizer, NULL);
+        if (tokenizer->error == PARSE_ERROR)
+            return NULL;
         struct t_token *token = *tokenizer->iter;
         if (token->type == T_EQUALS) {
             tokenizer->iter++;
@@ -805,37 +885,43 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
             add_child_atom(stmt, var);
             atom_t *expr = parse_comp(tokenizer);
             if (expr == NULL) {
+                free_atom_tree(var);
                 return NULL;
             }
             add_child_atom(stmt, expr);
         } else if (token->type == T_OPHAR) {
             tokenizer->iter = prev_iter;
             stmt = parse_comp(tokenizer);
+// TODO ??? design mem leak stuff
             if (stmt == NULL) {
                 return NULL;
             }
         } else {
             printf("PARSE_STMT NOT EQUALS OR OPHAR |%s|\n", token->value);
             tokenizer->error = PARSE_ERROR;
+            free_atom_tree(var);
             return NULL;
         }
         token = *tokenizer->iter;
         if (token != NULL && token->type != T_EOL) {
             tokenizer->error = PARSE_ERROR;
             if (token != NULL)
-                printf("PARSE_STMT_NOT_EOL |%s|%s\n", token->value, token_type_name(token->type));
+                printf("PARSE_STMT_NOT_EOL ERROR |%s|%s\n", token->value, token_type_name(token->type));
             else
-                printf("PARSE_STMT NOT EOL TOKEN NULL");
-            return stmt;
-        } else if (token == NULL) {
-            return stmt;
+                printf("PARSE_STMT NOT EOL TOKEN NULL ERROR");
+            free_atom_tree(var);
+            return NULL;
         }
     }
+    if (tokenizer->error == PARSE_ERROR)
+        return NULL;
     struct t_token *eol = *tokenizer->iter;
     if (eol != NULL && eol->type == T_EOL)
         tokenizer->iter++;
-    printd("PARSE_STMT_END %s:\n", (*tokenizer->iter)?(*tokenizer->iter)->value:"__");
-    printd("PARSE_STMT_RETURNS atom: %s:\n", stmt?stmt->value:"__");
+    if ((*tokenizer->iter) != NULL) {
+        printd("PARSE_STMT_END %s:\n", (*tokenizer->iter)?(*tokenizer->iter)->value:"__");
+        printd("PARSE_STMT_RETURNS atom: %s:\n", stmt?stmt->value:"__");
+    }
     return stmt;
 }
 
@@ -851,12 +937,17 @@ printd("INDENT FOUND start\n");
         tokenizer->iter++;}
     if (start_count <= previous_indent || token == NULL) {
 printf("PARSE_BLOCK_INDENT_PARSE_ERROR_ start %d prev %d\n", start_count, previous_indent);
+        free_atom_tree(block);
         tokenizer->error = PARSE_ERROR;
         return NULL;
     }
     int count = start_count;
     while (count == start_count) {
         atom_t *stmt = parse_stmt(tokenizer, start_count);
+        if (tokenizer->error == PARSE_ERROR) {
+            free_atom_tree(block);
+            return NULL;
+        }
 printd("statement parse returned to parse_block\n");
 if (*tokenizer->iter)
 printd("%s\n", (*tokenizer->iter)->value);
@@ -897,11 +988,15 @@ atom_t *parse_if_else_if(struct t_tokenizer *tokenizer, int current_indent) {
 atom_t *parse_if(struct t_tokenizer *tokenizer, int current_indent) {
     atom_t *if_clause = new_atom(strdup("if"), A_IF);
     atom_t *expr = parse_comp(tokenizer);
-    if (expr == NULL)
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(if_clause);
         return NULL;
+    }
     atom_t *block = parse_if_else_if(tokenizer, current_indent);
-    if (block == NULL)
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(if_clause);
         return NULL;
+    }
     add_child_atom(if_clause, expr);
     add_child_atom(if_clause, block);
     while (TRUE) {
@@ -927,16 +1022,22 @@ atom_t *parse_if(struct t_tokenizer *tokenizer, int current_indent) {
         else_if = *tokenizer->iter;
         if (else_if->type == T_COLUMN) {
             atom_t *block = parse_if_else_if(tokenizer, current_indent);
-            if (block == NULL)
+            if (tokenizer->error == PARSE_ERROR) {
+                free_atom_tree(if_clause);
                 return NULL;
+            }
             add_child_atom(if_clause, block);
         } else {
             atom_t *expr = parse_comp(tokenizer);
-            if (expr == NULL)
+            if (tokenizer->error == PARSE_ERROR) {
+                free_atom_tree(if_clause);
                 return NULL;
+            }
             atom_t *block = parse_if_else_if(tokenizer, current_indent);
-            if (block == NULL)
+            if (tokenizer->error == PARSE_ERROR) {
+                free_atom_tree(if_clause);
                 return NULL;
+            }
             add_child_atom(if_clause, expr);
             add_child_atom(if_clause, block);
         }
@@ -969,6 +1070,7 @@ atom_t *parse_for(struct t_tokenizer *tokenizer, int current_indent) {
     struct t_token *column = *tokenizer->iter;
     if (column == NULL || column->type != T_COLUMN) {
         printf("PARSE_FOR column\n");
+        free_atom_tree(expr);
         tokenizer->error = PARSE_ERROR;
         return NULL;
     }
@@ -976,15 +1078,19 @@ atom_t *parse_for(struct t_tokenizer *tokenizer, int current_indent) {
     struct t_token *eol = *tokenizer->iter;
     if (eol == NULL || eol->type != T_EOL) {
         printf("PARSE_FOR not eol\n");
+        free_atom_tree(expr);
         tokenizer->error = PARSE_ERROR;
         return NULL;
     }
     tokenizer->iter++;
-    atom_t *var = new_atom(strdup(var_name->value), A_VAR);
     atom_t *for_loop = new_atom(strdup("FOR"), A_FOR);
-    atom_t *block = parse_block(tokenizer, current_indent);
+    atom_t *var = new_atom(strdup(var_name->value), A_VAR);
     add_child_atom(for_loop, var);
     add_child_atom(for_loop, expr);
+    atom_t *block = parse_block(tokenizer, current_indent);
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(for_loop);
+    }
     add_child_atom(for_loop, block);
     return for_loop;
 }
@@ -1000,13 +1106,16 @@ atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
     tokenizer->iter++;
     atom_t *class = new_atom(strdup(class_name->value), A_CLASS);
     atom_t *inherits = parse_params(tokenizer);
-    if (tokenizer->error == PARSE_ERROR)
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(class);
         return NULL;
+    }
     add_child_atom(class, inherits);
     printf("|%s|\n", (*tokenizer->iter)->value);
     struct t_token *column = *tokenizer->iter;
     if (column == NULL || column->type != T_COLUMN) {
         printf("PARSE_CLASS column ERR\n");
+        free_atom_tree(class);
         tokenizer->error = PARSE_ERROR;
         return NULL;
     }
@@ -1016,6 +1125,7 @@ atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
     struct t_token *indent = *tokenizer->iter;
     if (indent->type != T_INDENT) {
     printf("PARSE_CLASS_NO_INDENT_PARSE_ERROR_ \n");
+        free_atom_tree(class);
         tokenizer->error = PARSE_ERROR;
         return NULL;
     }
@@ -1025,6 +1135,7 @@ atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
         indent = *tokenizer->iter;
         if (indent->type != T_INDENT) {
         printf("PARSE_CLASS_NO_INDENT_PARSE_ERROR_ got %s\n", indent->value);
+            free_atom_tree(class);
             tokenizer->error = PARSE_ERROR;
             return NULL;
         }
@@ -1032,12 +1143,14 @@ atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
        tokenizer->iter++;
         if (start_count <= current_indent || token == NULL) {
     printf("PARSE_CLASS_INDENT_PARSE_ERROR_ start %d prev %d\n", start_count, current_indent);
-           tokenizer->error = PARSE_ERROR;
+            free_atom_tree(class);
+            tokenizer->error = PARSE_ERROR;
             return NULL;
         }
         struct t_token *token = *tokenizer->iter;
         if (token == NULL || token->type != T_IDENTIFIER) {
             printf("PARSE_CLASS ASSG IDENTIFIER ERR\n");
+            free_atom_tree(class);
             tokenizer->error = PARSE_ERROR;
             return NULL;
         }
@@ -1045,29 +1158,36 @@ atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
         if (!strcmp(token->value, "def")) {
             tokenizer->iter++;
             field = parse_func(tokenizer, current_indent);
-            if (field == NULL)
+            if (tokenizer->error == PARSE_ERROR) {
+                free_atom_tree(class);
                 return NULL;
+            }
             printd("PARSED CLASS METHOD\n");
+            add_child_atom(class, field);
         } else {
             struct t_token **prev_iter = tokenizer->iter;
             field = parse_var(tokenizer, NULL);
-            if (field == NULL)
+            if (tokenizer->error == PARSE_ERROR) {
+                free_atom_tree(class);
                 return NULL;
+            }
+            add_child_atom(class, field);
             struct t_token *token = *tokenizer->iter;
             if (token->type != T_EQUALS) {
                 printf("PARSE_CLASS ERR ATOM NOT EQUALS %s\n", token->value);
+                free_atom_tree(class);
                 tokenizer->error = PARSE_ERROR;
                 return NULL;
             }
             tokenizer->iter++;
             atom_t *expr = parse_comp(tokenizer);
-            if (expr == NULL) {
+            if (tokenizer->error == PARSE_ERROR) {
+                free_atom_tree(class);
                 return NULL;
             }
             add_child_atom(field, expr);
             printd("PARSED CLASS FIELD\n");
         }
-        add_child_atom(class, field);
         indent = (*tokenizer->iter);
         if (indent == NULL || indent->type != T_INDENT)
             break;
@@ -1121,11 +1241,13 @@ int tokenize_stream(FILE *fp, atom_tree_t* root, struct t_tokenizer *tokenizer) 
         // Replacing spaces in the beginning of statements with indents
         int indent_count = 0;
         while (*tokens != NULL && (*tokens)->type == T_SPACE) {
+            free(*tokens);
             tokens++;
             indent_count++;
         }
         // Getting rid of blank lines
         if ((*tokens)->type == T_EOL) {
+            free(*tokens);
             tokens++;
             continue;
         }
@@ -1191,5 +1313,6 @@ void free_atom_tree(atom_t *atom) {
     if (atom->child)
         free_atom_tree(atom->child);
     free(atom->value);
+    free(atom);
 }
 
