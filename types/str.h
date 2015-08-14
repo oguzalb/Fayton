@@ -1,5 +1,5 @@
 #ifndef FAY_STR_H
-#include "interpret.h"
+#include "../interpret.h"
 
 void init_str();
 object_t *new_str(GArray *);

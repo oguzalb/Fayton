@@ -1,5 +1,5 @@
 #ifndef FAY_INT_H
-#include "interpret.h"
+#include "../interpret.h"
 
 void init_int();
 object_t *new_int(GArray *);

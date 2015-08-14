@@ -1,5 +1,5 @@
 #ifndef FAY_LIST_H
-#include "interpret.h"
+#include "../interpret.h"
 
 void init_list();
 object_t *new_list(GArray *);

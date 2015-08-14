@@ -107,11 +107,11 @@ object_t *new_class(char*);
 object_t *new_object(int);
 void print_var(char*, object_t*);
 
-#include "int.h"
-#include "bool.h"
-#include "none.h"
-#include "str.h"
-#include "list.h"
-#include "dict.h"
-#include "thread.h"
+#include "types/int.h"
+#include "types/bool.h"
+#include "types/none.h"
+#include "types/str.h"
+#include "types/list.h"
+#include "types/dict.h"
+#include "types/thread.h"
 #endif

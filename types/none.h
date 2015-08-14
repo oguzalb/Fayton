@@ -1,5 +1,5 @@
 #ifndef FAY_NONE_H
-#include "interpret.h"
+#include "../interpret.h"
 
 void init_none();
 object_t *new_none_internal();

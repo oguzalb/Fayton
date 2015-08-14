@@ -1,5 +1,5 @@
 #ifndef FAY_BOOL_H
-#include "interpret.h"
+#include "../interpret.h"
 
 void init_bool();
 object_t *new_bool(GArray *);

@@ -1,7 +1,8 @@
 LIBS=`pkg-config --cflags glib-2.0` `pkg-config --libs glib-2.0`
 FLAGS=-std=gnu99 -g
 DEBUG=
-SOURCES=int.c bool.c list.c dict.c str.c thread.c interpret.c parse.c none.c
+TYPES=int.c bool.c list.c dict.c str.c thread.c none.c
+SOURCES=interpret.c parse.c $(TYPES:%.c=types/%.c)
 OBJECTS=$(SOURCES:.c=.o)
 .c.o:
 	cc -c $< ${DEBUG} ${LIBS} ${FLAGS} -o $@
@@ -13,7 +14,7 @@ repl: $(OBJECTS)
 	cc repl.c ${OBJECTS} -o repl.out ${DEBUG} -g ${LIBS} ${FLAGS}
 all: repl tests
 clean:
-	rm *.o *.out
+	find . -name "*.o" -delete -o -name "*.out" -delete
 test_run:  all
 	./test_parse.out
 	./test_interpret.out

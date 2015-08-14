@@ -1,5 +1,5 @@
 #ifndef FAY_DICT_H
-#include "interpret.h"
+#include "../interpret.h"
 
 void init_dict();
 object_t *new_dict(GArray *);
