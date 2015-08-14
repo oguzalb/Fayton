@@ -53,9 +53,9 @@ object_t *new_int_internal(int value) {
 void init_int() {
     object_t *int_class = new_class(strdup("int"));
     int_class->class_props->ob_func = new_int;
-    object_add_field(int_class, "__add__", new_func(int_add_func));
-    object_add_field(int_class, "__sub__", new_func(int_sub_func));
-    object_add_field(int_class, "__cmp__", new_func(int_cmp_func));
-    object_add_field(int_class, "__eq__", new_func(object_equals));
+    object_add_field(int_class, "__add__", new_func(int_add_func, strdup("__add__")));
+    object_add_field(int_class, "__sub__", new_func(int_sub_func, strdup("__sub__")));
+    object_add_field(int_class, "__cmp__", new_func(int_cmp_func, strdup("__cmp__")));
+    object_add_field(int_class, "__eq__", new_func(object_equals, strdup("__eq__")));
     register_global(strdup("int"), int_class);
 }

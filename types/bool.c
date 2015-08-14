@@ -34,6 +34,6 @@ void init_bool() {
 
     object_t *bool_class = new_class(strdup("bool"));
     bool_class->class_props->ob_func = new_bool;
-    object_add_field(bool_class, "__eq__", new_func(object_equals));
+    object_add_field(bool_class, "__eq__", new_func(object_equals, strdup("__eq__")));
     register_global(strdup("bool"), bool_class);
 }

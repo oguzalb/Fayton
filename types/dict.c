@@ -27,6 +27,6 @@ void init_dict() {
     object_t *dict_class = new_class(strdup("dict"));
     dict_class->class_props->ob_func = new_dict;
     //object_add_field(dict_class, "__iter__", new_func(iter_dict_func));
-    object_add_field(dict_class, "keys", new_func(dict_keys));
+    object_add_field(dict_class, "keys", new_func(dict_keys, strdup("keys")));
     register_global(strdup("dict"), dict_class);
 }

@@ -78,6 +78,12 @@ int main() {
         printf("%s\n", buff);
         printd("interpreting\n", buff);
         interpret_block(tree->root, interpreter.globals, 0);
+        if (interpreter.error == RUN_ERROR) {
+            struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
+            print_stack_trace(main_thread);
+            g_array_free(main_thread->stack_trace, FALSE);
+// TODO free also others
+        }
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
     }
     atom_tree_t *tree;

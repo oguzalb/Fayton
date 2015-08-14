@@ -80,13 +80,13 @@ object_t *new_list(GArray *args) {
 void init_list() {
     object_t *listiterator_class = new_class(strdup("listiterator"));
     listiterator_class->class_props->ob_func = new_listiterator;
-    object_add_field(listiterator_class, "next", new_func(listiterator_next_func));
+    object_add_field(listiterator_class, "next", new_func(listiterator_next_func, strdup("next")));
     register_global(strdup("listiterator"), listiterator_class);
     
     object_t *list_class = new_class(strdup("list"));
     list_class->class_props->ob_func = new_list;
-    object_add_field(list_class, "__iter__", new_func(list_iter_func));
-    object_add_field(list_class, "append", new_func(list_append));
-    object_add_field(list_class, "extend", new_func(list_extend));
+    object_add_field(list_class, "__iter__", new_func(list_iter_func, strdup("__iter__")));
+    object_add_field(list_class, "append", new_func(list_append, strdup("append")));
+    object_add_field(list_class, "extend", new_func(list_extend, strdup("extend")));
     register_global(strdup("list"), list_class);
 }

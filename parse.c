@@ -885,7 +885,8 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
             add_child_atom(stmt, var);
             atom_t *expr = parse_comp(tokenizer);
             if (expr == NULL) {
-                free_atom_tree(var);
+                if(var)
+                    free_atom_tree(var);
                 return NULL;
             }
             add_child_atom(stmt, expr);
@@ -899,7 +900,8 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
         } else {
             printf("PARSE_STMT NOT EQUALS OR OPHAR |%s|\n", token->value);
             tokenizer->error = PARSE_ERROR;
-            free_atom_tree(var);
+            if (var)
+                free_atom_tree(var);
             return NULL;
         }
         token = *tokenizer->iter;

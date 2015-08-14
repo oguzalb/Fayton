@@ -21,9 +21,19 @@ char *object_type_name(int type) {
 
 #define FUNC_STRUCT_TYPE(x) object_t *(*x)(GArray *)
 
+void print_stack_trace(struct py_thread *thread) {
+    GArray *stack_trace = thread->stack_trace;
+    printf("stack trace:\n");
+    printf("%d elements\n", stack_trace->len);
+    for (int i=0; i < stack_trace->len; i++)
+        printf("-> %s\n", g_array_index(stack_trace, char*, i));
+    printf("%s\n", interpreter.exc_str);
+}
+
 void print_var_each(gpointer name, gpointer obj, gpointer user_data) {
     print_var((char*) name, (object_t*) obj);
 }
+
 void print_pair_each(gpointer key, gpointer value, gpointer user_data) {
     print_var("key", (object_t*) key);
     print_var("value", (object_t*) value);
@@ -75,6 +85,7 @@ object_t *new_class(char* name) {
     cls = new_object(CLASS_TYPE);
     cls->class_props = malloc(sizeof(struct class_type));
     cls->class_props->inherits = NULL;
+    cls->class_props->name = name;
     return cls;
 }
 
@@ -98,8 +109,8 @@ object_t *object_get_field(object_t *object, char* name) {
         return field;
     else if (object->class->class_props->inherits == NULL) {
         interpreter.error = RUN_ERROR;
-        printf("Field not found %s\n", name);
-        assert(FALSE);
+        set_exception("Field not found %s\n", name);
+        return NULL;
     }
     printd("CLASS FIELDS\n");
     g_hash_table_foreach(object->class->fields, print_var_each, NULL);
@@ -108,8 +119,8 @@ object_t *object_get_field(object_t *object, char* name) {
         printd("INHERITS FIELDS\n");
         g_hash_table_foreach(object->class->class_props->inherits->fields, print_var_each, NULL);
         interpreter.error = RUN_ERROR;
-        printf("Field not found %s\n", name);
-        assert(FALSE);
+        set_exception("Field not found %s\n", name);
+        return NULL;
     }
     printd("got field |%s|\n", name);
     
@@ -133,7 +144,7 @@ object_t *get_var(GHashTable *context, char *name) {
     if (var == NULL) {
         interpreter.error = RUN_ERROR;
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
-        printf("Global not found |%s|\n", name);
+        set_exception("Global not found |%s|\n", name);
         return NULL;
     }
     return var;
@@ -144,7 +155,7 @@ object_t *get_global(char*name) {
     if (cls == NULL) {
         interpreter.error = RUN_ERROR;
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
-        printf("Global not found |%s|\n", name);
+        set_exception("Global not found |%s|\n", name);
         return NULL;
     }
     return cls;
@@ -153,18 +164,20 @@ object_t *get_global_no_check(char*name) {
     return g_hash_table_lookup(interpreter.globals, name);
 }
 
-object_t *new_func(object_t *(*func)(GArray *)) {
+object_t *new_func(object_t *(*func)(GArray *), char *name) {
     object_t *func_obj = new_object(FUNC_TYPE);
     func_obj->func_props = malloc(sizeof(struct func_type));
     func_obj->func_props->ob_func = func;
+    func_obj->func_props->name = name;
     func_obj->class = NULL;
     return func_obj;
 }
 
-object_t *new_user_func(atom_t *func) {
+object_t *new_user_func(atom_t *func, char* name) {
     object_t *func_obj = new_object(USERFUNC_TYPE);
     func_obj->userfunc_props = malloc(sizeof(struct userfunc_type));
     func_obj->userfunc_props->ob_userfunc = func;
+    func_obj->userfunc_props->name = name;
     func_obj->class = NULL;
     return func_obj;
 }
@@ -212,6 +225,8 @@ guint object_hash(gconstpointer key) {
 object_t *sum_func(GArray *args) {
     object_t *iterable = g_array_index(args, object_t*, 0);
     object_t *iter_func = object_get_field(iterable, "__iter__");
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
     object_t *iterator;
     if (iter_func->type == USERFUNC_TYPE) {
         GHashTable *sub_context = g_hash_table_new(g_str_hash, g_str_equal);
@@ -224,6 +239,8 @@ object_t *sum_func(GArray *args) {
         iterator = iter_func->func_props->ob_func(args);
     }
     object_t *next_func = object_get_field(iterator, "next");
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
     object_t *int_obj = NULL;
     int sum = 0;
     do {
@@ -281,10 +298,19 @@ object_t *print_func(GArray *args) {
     }
 }
 
+struct py_thread *new_thread_struct() {
+    struct py_thread *thread = malloc(sizeof(struct py_thread));
+    thread->stack_trace = g_array_new(TRUE, TRUE, sizeof(char *));
+    return thread;
+}
+
 void init_interpreter() {
     interpreter.error = 0;
     interpreter.last_accessed = NULL;
     interpreter.globals = g_hash_table_new(g_str_hash, g_str_equal);
+    interpreter.threads = g_array_new(TRUE, TRUE, sizeof(struct py_thread *));
+    struct py_thread *main_thread = new_thread_struct();
+    g_array_append_val(interpreter.threads, main_thread);
 
     object_t *object_class = new_class(strdup("object"));
     object_class->class_props->ob_func = new_object_instance;
@@ -295,8 +321,8 @@ void init_interpreter() {
     init_bool();
     init_none();
 
-    register_global(strdup("range"), new_func(range_func));
-    register_global(strdup("sum"), new_func(sum_func));
+    register_global(strdup("range"), new_func(range_func, strdup("range")));
+    register_global(strdup("sum"), new_func(sum_func, strdup("sum")));
 
     init_list();
 
@@ -304,7 +330,7 @@ void init_interpreter() {
 
     init_thread();
 
-    register_global(strdup("print"), new_func(print_func));
+    register_global(strdup("print"), new_func(print_func, strdup("print")));
 }
 
 object_t *lookup_var(GHashTable *context, char* name) {
@@ -320,7 +346,8 @@ object_t *lookup_var(GHashTable *context, char* name) {
     }
     if (object == NULL) {
         interpreter.error = RUN_ERROR;
-        printd("NameError %s not found\n", name);
+        set_exception("NameError %s not found\n", name);
+        return NULL;
     }
     return object;
 }
@@ -336,7 +363,7 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
         return NULL;
     }
     if (func->type != FUNC_TYPE && func->type != USERFUNC_TYPE && func->type != CLASS_TYPE) {
-        printf("OBJ IS NOT CALLABLE %s\n", object_type_name(func->type));
+        set_exception("OBJ IS NOT CALLABLE %s\n", object_type_name(func->type));
         interpreter.error = RUN_ERROR;
         return NULL;
     }
@@ -395,12 +422,27 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
     }
     printd("ADDED PARAMS\n");
     printd("calling func type %s\n", object_type_name(func->type));
-    if (func->type == USERFUNC_TYPE)
-        return interpret_block(func->userfunc_props->ob_userfunc->child->next, sub_context, current_indent);
-    else if (func->type == FUNC_TYPE)
-        return func->func_props->ob_func(args);
-    else if (func->type == CLASS_TYPE)
-        return func->class_props->ob_func(args);
+    struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
+    char* func_name;
+    object_t *result;
+    if (func->type == USERFUNC_TYPE) {
+        func_name = strdup(func->userfunc_props->name);
+        g_array_append_val(main_thread->stack_trace, func_name);
+        result = interpret_block(func->userfunc_props->ob_userfunc->child->next, sub_context, current_indent);
+    } else if (func->type == FUNC_TYPE) {
+        func_name = strdup(func->func_props->name);
+        g_array_append_val(main_thread->stack_trace, func_name);
+        result = func->func_props->ob_func(args);
+    } else if (func->type == CLASS_TYPE) {
+        func_name = strdup(func->class_props->name);
+        g_array_append_val(main_thread->stack_trace, func_name);
+        result = func->class_props->ob_func(args);
+    }
+    if (interpreter.error != RUN_ERROR) {
+        g_array_remove_index(main_thread->stack_trace, main_thread->stack_trace->len - 1);
+        free(func_name);
+    }
+    return result;
 }
 
 object_t *interpret_list(atom_t *expr, GHashTable *context, int current_indent) {
@@ -443,7 +485,7 @@ object_t *interpret_if(atom_t *expr, GHashTable *context, int current_indent) {
             if (interpreter.error == RUN_ERROR)
                 return NULL;
             if (bool_obj->type != BOOL_TYPE) {
-                printd("NOT A BOOL TYPE\n");
+                set_exception("NOT A BOOL TYPE\n");
                 interpreter.error = RUN_ERROR;
                 return NULL;
             }
@@ -473,6 +515,7 @@ object_t *interpret_expr(atom_t *expr, GHashTable *context, int current_indent) 
         return value;
     } else if (expr->type == A_FUNCCALL) {
         printd("CALL FUNC \n");
+        // TODO more than one thread and stack trace
         return interpret_funccall(expr, context, current_indent);
     } else if (expr->type == A_INTEGER) {
         object_t *int_val = new_int_internal(atoi(expr->value));
@@ -496,7 +539,7 @@ object_t *interpret_expr(atom_t *expr, GHashTable *context, int current_indent) 
         if (expr->child->type == A_VAR) {
             printd("%s\n", expr->child->value);
             object = lookup_var(context, expr->child->value);
-            if (object == NULL) {
+            if (interpreter.error == RUN_ERROR) {
                 return NULL;
             }
             print_var("object", object);
@@ -508,15 +551,12 @@ object_t *interpret_expr(atom_t *expr, GHashTable *context, int current_indent) 
         interpreter.last_accessed = object;
         printd("last accessed %p\n", object);
         object_t *field = object_get_field(object, expr->child->next->value);
-        if (field == NULL) {
-            interpreter.error = RUN_ERROR;
-            printd("field not found %s\n", expr->child->next->value);
+        if (interpreter.error == RUN_ERROR)
             return NULL;
-        }
         return field;
     } else {
         interpreter.error = RUN_ERROR;
-        printf("TYPE INCORRECT %s\n", atom_type_name(expr->type));
+        set_exception("TYPE INCORRECT %s\n", atom_type_name(expr->type));
         return NULL;
     }
 }
@@ -571,7 +611,7 @@ object_t *interpret_stmt(atom_t *stmt, GHashTable *context, int current_indent) 
             register_global(var_name->value, item);
             interpret_block(block, context, current_indent);
             if (interpreter.error == RUN_ERROR) {
-                printf("ERROR OCCURED WHILE FOR STMTS\n");
+                set_exception("ERROR OCCURED WHILE FOR STMTS\n");
                 return NULL;
             }
         }
@@ -579,7 +619,7 @@ object_t *interpret_stmt(atom_t *stmt, GHashTable *context, int current_indent) 
 printd("A_IF\n");
         return interpret_if(stmt, context, current_indent);
     } else if (stmt->type == A_FUNCDEF) {
-        object_t *userfunc = new_user_func(stmt);
+        object_t *userfunc = new_user_func(stmt, stmt->value);
         register_global(stmt->value, userfunc);
     } else if (stmt->type == A_CLASS) {
         atom_t *class_name = stmt;
@@ -589,7 +629,7 @@ printd("A_IF\n");
         atom_t *field = stmt->child->next;
         while (field) {
             if (field->type == A_FUNCDEF) {
-                object_t *class_func = new_user_func(field);
+                object_t *class_func = new_user_func(field, field->value);
                 object_add_field(class, field->value, class_func);
                 printd("added class field func %s.%s\n", class_name->value, field->value);
             } else if (field->type == A_VAR) {
@@ -607,7 +647,7 @@ printd("A_IF\n");
             object_t *parent_class = get_var(context, inherits->value);
             if (parent_class == NULL) {
                 interpreter.error = RUN_ERROR;
-                printf("Class does not exist: %s\n", inherits->value);
+                set_exception("Class does not exist: %s\n", inherits->value);
                 return NULL;
             }
             class->class_props->inherits = parent_class;
@@ -628,7 +668,7 @@ object_t *interpret_block(atom_t *block, GHashTable *context, int current_indent
     printd("interpreting block\n");
     if (block->type != A_BLOCK) {
         interpreter.error = RUN_ERROR;
-        printf("NOT A BLOCK\n");
+        set_exception("NOT A BLOCK\n");
         return NULL;
     }
     atom_t *stmt = block->child;

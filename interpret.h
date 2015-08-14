@@ -21,6 +21,9 @@
 #define BOOL_TYPE 11
 #define NONE_TYPE 12
 
+#define set_exception(fmt, args...) \
+        {char *msg; asprintf(&msg, fmt, ##args); interpreter.exc_str = msg;}
+
 #define RUN_ERROR 1
 
 struct int_type {
@@ -54,16 +57,19 @@ struct thread_type {
 
 struct func_type {
     struct _object *(*ob_func)(GArray *);
+    char *name;
 };
 
 struct userfunc_type {
     atom_t *ob_userfunc;
+    char *name;
 };
 
 struct class_type {
 // TODO CHAIN
     struct _object *inherits;
     struct _object *(*ob_func)(GArray *);
+    char *name;
 };
 
 struct slice_type {
@@ -91,10 +97,16 @@ typedef struct _object {
     };
 } object_t;
 
+struct py_thread {
+    GArray *stack_trace;
+};
+
 struct _interpreter {
     int error;
     object_t *last_accessed;
     GHashTable *globals;
+    GArray *threads;
+    char* exc_str;
 } interpreter;
 
 void print_var_each(gpointer, gpointer, gpointer);
@@ -103,7 +115,7 @@ void init_interpreter();
 gboolean object_equal(gconstpointer, gconstpointer);
 guint object_hash(gconstpointer);
 object_t *object_equals(GArray *);
-object_t *new_func(object_t *(*)(GArray *));
+object_t *new_func(object_t *(*)(GArray *), char *);
 void object_add_field(object_t *, char*, object_t *);
 object_t *object_get_field(object_t *, char*);
 void register_global(char*, object_t *);
