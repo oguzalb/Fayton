@@ -59,7 +59,7 @@ object_t *new_object(int type) {
 object_t *new_object_instance(GArray *args) {
     object_t *object = (object_t *) malloc(sizeof(object_t));
     object->fields = g_hash_table_new(g_str_hash, g_str_equal);
-    object->class = g_array_index(args, object_t *, 0);
+    object->class = (object_t *)g_array_index(args, object_t *, 0);
     object->type = CUSTOMOBJECT_TYPE;
     return object;
 }
@@ -358,7 +358,7 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
         }
         while (param) {
             object_t *value = interpret_expr(param, context, current_indent);
-            if (interpreter.error != NULL) {
+            if (interpreter.error == RUN_ERROR) {
                 return NULL;
             }
             printd("ADDING ARGUMENT %s\n", param->value);
@@ -384,7 +384,7 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
                 printd("More parameter passed than needed next: %s\n", param->value);
                 return NULL;}
             object_t *value = interpret_expr(param, context, current_indent);
-            if (interpreter.error != NULL) {
+            if (interpreter.error == RUN_ERROR) {
                 return NULL;
             }
             g_hash_table_insert(sub_context, param_name->value, value);

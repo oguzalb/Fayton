@@ -1,7 +1,7 @@
 LIBS=`pkg-config --cflags glib-2.0` `pkg-config --libs glib-2.0`
 FLAGS=-std=gnu99 -g
 DEBUG=
-TYPES=int.c bool.c list.c dict.c str.c thread.c none.c
+TYPES=int.c bool.c list.c dict.c str.c thread.c none.c slice.c
 SOURCES=interpret.c parse.c $(TYPES:%.c=types/%.c)
 OBJECTS=$(SOURCES:.c=.o)
 .c.o:

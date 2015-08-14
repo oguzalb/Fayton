@@ -31,6 +31,11 @@ struct list_type {
     GArray *ob_aval;
 };
 
+struct listiterator_type {
+    struct _object *ob_ob;
+    int ob_ival;
+};
+
 struct dict_type {
     GHashTable *ob_dval;
 };
@@ -61,9 +66,10 @@ struct class_type {
     struct _object *(*ob_func)(GArray *);
 };
 
-struct listiterator_type {
-    struct _object *ob_ob;
-    int ob_ival;
+struct slice_type {
+    int start;
+    int stop;
+    int step;
 };
 
 typedef struct _object {
@@ -81,6 +87,7 @@ typedef struct _object {
         struct class_type *class_props;
         struct userfunc_type *userfunc_props;
         struct listiterator_type *listiterator_props;
+        struct slice_type *slice_props;
     };
 } object_t;
 
@@ -88,7 +95,6 @@ struct _interpreter {
     int error;
     object_t *last_accessed;
     GHashTable *globals;
-
 } interpreter;
 
 void print_var_each(gpointer, gpointer, gpointer);
@@ -114,4 +120,5 @@ void print_var(char*, object_t*);
 #include "types/list.h"
 #include "types/dict.h"
 #include "types/thread.h"
+
 #endif
