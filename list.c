@@ -58,19 +58,24 @@ object_t *new_listiterator_internal(object_t *list) {
     return listiterator;
 }
 
-object_t *new_list(GArray *args) {
-    // TODO args check
-    object_t *list;
-    if (args != NULL && args->len == 1)
-        list = g_array_index(args, object_t*, 0);
-    else
-        list = new_object(LIST_TYPE);
+object_t *new_list_internal() {
+    object_t* list = new_object(LIST_TYPE);
     list->list_props = malloc(sizeof(struct list_type));
     list->class = get_global("list");
     list->list_props->ob_aval = g_array_new(TRUE, TRUE, sizeof(object_t *));
     return list;
 }
 
+object_t *new_list(GArray *args) {
+    // TODO args check
+    object_t *list;
+    // TODO this should iterate and copy list
+    if (args != NULL && args->len == 1)
+        list = g_array_index(args, object_t*, 0);
+    else
+        list = new_list_internal();
+    return list;
+}
 
 void init_list() {
     object_t *listiterator_class = new_class(strdup("listiterator"));

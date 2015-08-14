@@ -3,7 +3,7 @@
 
 void init_list();
 object_t *new_list(GArray *);
-object_t *new_list_internal(int);
+object_t *new_list_internal();
 object_t *list_iter_func(GArray *);
 object_t *list_append(GArray *);
 object_t *list_append_internal(object_t *, object_t *);

@@ -404,7 +404,7 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
 }
 
 object_t *interpret_list(atom_t *expr, GHashTable *context, int current_indent) {
-    object_t *list = new_list(NULL);
+    object_t *list = new_list_internal();
     atom_t *elem = expr->child;
     while (elem != NULL) {
         object_t *result = interpret_expr(elem, context, current_indent);
