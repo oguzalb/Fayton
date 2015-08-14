@@ -70,7 +70,6 @@ struct t_tokenizer {
     struct t_token** iter;
     struct t_token** tokens;
     int current_line;
-    GArray *contexts;
     int error;
 };
 

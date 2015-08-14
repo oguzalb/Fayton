@@ -35,7 +35,6 @@
 struct t_tokenizer *new_tokenizer(){
     struct t_tokenizer *tokenizer = malloc(sizeof(struct t_tokenizer));
     tokenizer->error = 0;
-    tokenizer->contexts = g_array_new(TRUE, TRUE, sizeof(GHashTable *));
     tokenizer->tokens = NULL;
     return tokenizer;
 }
@@ -765,13 +764,6 @@ atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
     atom_t *block = parse_block(tokenizer, current_indent);
     add_child_atom(funcdef, params);
     add_child_atom(funcdef, block);
-    GHashTable* sub_context = g_hash_table_new(g_str_hash, g_str_equal);
-    atom_t *param = params->child;
-    while (param != NULL) {
-        g_hash_table_insert(sub_context, param->value, NULL);
-        param = param->next;
-    }
-    g_array_append_val(tokenizer->contexts, sub_context);
     return funcdef;
 }
 
@@ -1188,8 +1180,6 @@ void free_tokenizer(struct t_tokenizer *tokenizer) {
         tokenizer->iter++;
     }
     printd("Freeing tokenizer struct\n");
-    g_array_free(tokenizer->contexts, FALSE);
-// TODO free contexts also
     free(tokenizer);
     printd("Freed tokenizer struct\n");
 }
