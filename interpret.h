@@ -114,17 +114,14 @@ object_t *interpret_block(atom_t *, GHashTable *, int);
 void init_interpreter();
 gboolean object_equal(gconstpointer, gconstpointer);
 guint object_hash(gconstpointer);
-object_t *object_equals(GArray *);
 object_t *new_func(object_t *(*)(GArray *), char *);
-void object_add_field(object_t *, char*, object_t *);
-object_t *object_get_field(object_t *, char*);
 void register_global(char*, object_t *);
 object_t *get_global(char*);
 object_t *get_global_no_check(char*);
 object_t *new_class(char*);
-object_t *new_object(int);
 void print_var(char*, object_t*);
 
+#include "types/object.h"
 #include "types/int.h"
 #include "types/bool.h"
 #include "types/none.h"
