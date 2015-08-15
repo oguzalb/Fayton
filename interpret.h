@@ -22,7 +22,7 @@
 #define NONE_TYPE 12
 
 #define set_exception(fmt, args...) \
-        {char *msg; asprintf(&msg, fmt, ##args); interpreter.exc_str = msg;}
+        {char *msg; asprintf(&msg, fmt, ##args); struct py_thread *mt = g_array_index(interpreter.threads, struct py_thread*, 0); mt->exc_msg = msg;}
 
 #define RUN_ERROR 1
 
@@ -99,6 +99,7 @@ typedef struct _object {
 
 struct py_thread {
     GArray *stack_trace;
+    char * exc_msg;
 };
 
 struct _interpreter {
@@ -106,7 +107,6 @@ struct _interpreter {
     object_t *last_accessed;
     GHashTable *globals;
     GArray *threads;
-    char* exc_str;
 } interpreter;
 
 void print_var_each(gpointer, gpointer, gpointer);

@@ -388,23 +388,30 @@ atom_t *parse_slice(struct t_tokenizer *tokenizer) {
         printf("PARSE_CALLPARAMS PARSE_ERROR\n");
         return NULL;
     }
-    atom_t *slice = new_atom(strdup("getitem"), A_SLICE);
 // TODO expr
     atom_t *first_arg = parse_comp(tokenizer);
     if (first_arg == NULL)
         return NULL;
-    add_child_atom(slice, first_arg);
     atom_t *prev_arg = first_arg;
     while (TRUE) {
         token = *tokenizer->iter;
 printd("%s++\n", token->value);
         if (token->type == T_CBRACKET) {
-            return slice;
+            if (first_arg->next == NULL) {
+                return first_arg;
+            }
+            atom_t *funccall = new_atom(strdup("slicecall"), A_FUNCCALL);
+            atom_t *slice = new_atom(strdup("slice"), A_VAR);
+            add_child_atom(funccall, slice);
+            atom_t *params = new_atom(strdup("params"), A_PARAMS);
+            add_child_atom(funccall, params);
+            add_child_atom(params, first_arg);
+            return funccall;
         }
         if (token->type != T_COLUMN) {
 printf("PARSE_GETITEM COLUMN ERR %s %s\n", token->value, token_type_name(token->type));
             tokenizer->error = PARSE_ERROR;
-            free_atom_tree(slice);
+            free_atom_tree(first_arg);
             return NULL;
         }
         tokenizer->iter++;
@@ -652,11 +659,13 @@ atom_t *parse_power(struct t_tokenizer *tokenizer) {
             add_child_atom(trailer, top_trailer);
             switch_children_atom(trailer);
             top_trailer = trailer;
-        } else if (trailer->type == A_FUNCCALL) {
+// hacky but... :)
+        } else if (trailer->type == A_FUNCCALL && strcmp(trailer->value, "slicecall")) {
             add_child_atom(trailer, top_trailer);
             switch_children_atom(trailer);
             top_trailer = trailer;
-        } else if (trailer->type == A_SLICE) {
+        } else {
+// SLICE
             atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
             add_child_atom(accessor, top_trailer);
             atom_t *getitem = new_atom(strdup("__getitem__"), A_VAR);

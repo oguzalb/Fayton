@@ -27,7 +27,7 @@ void print_stack_trace(struct py_thread *thread) {
     printf("%d elements\n", stack_trace->len);
     for (int i=0; i < stack_trace->len; i++)
         printf("-> %s\n", g_array_index(stack_trace, char*, i));
-    printf("%s\n", interpreter.exc_str);
+    printf("%s\n", thread->exc_msg);
 }
 
 void print_var_each(gpointer name, gpointer obj, gpointer user_data) {

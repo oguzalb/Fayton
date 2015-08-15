@@ -413,14 +413,15 @@ else:\n\
               VAR:c\n\
             VAR:__getitem__\n\
           PARAMS:params\n\
-            SLICE:getitem\n\
-              INTEGER:1\n\
-              INTEGER:2\n\
-              INTEGER:3\n\
+            FUNCCALL:slicecall\n\
+              VAR:slice\n\
+              PARAMS:params\n\
+                INTEGER:1\n\
+                INTEGER:2\n\
+                INTEGER:3\n\
         VAR:__getitem__\n\
       PARAMS:params\n\
-        SLICE:getitem\n\
-          INTEGER:1\n", &tree);
+        INTEGER:1\n", &tree);
     //fclose(stream);
     return 0;
     //fclose(fp);
