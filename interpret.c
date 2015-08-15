@@ -14,6 +14,7 @@ char *object_type_name(int type) {
         case 10: return "THREAD";
         case 11: return "BOOL";
         case 12: return "NONE";
+        case 13: return "SLICE";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -245,6 +246,7 @@ void init_interpreter() {
     init_str();
     init_bool();
     init_none();
+    init_slice();
 
     register_global(strdup("range"), new_func(range_func, strdup("range")));
     register_global(strdup("sum"), new_func(sum_func, strdup("sum")));

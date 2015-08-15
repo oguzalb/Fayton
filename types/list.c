@@ -58,6 +58,27 @@ object_t *new_listiterator_internal(object_t *list) {
     return listiterator;
 }
 
+object_t *list_getitem_func(GArray *args) {
+    assert(args->len == 2);
+    object_t *list = g_array_index(args, object_t *, 0);
+    object_t *slice = g_array_index(args, object_t *, 1);
+    if (slice->type == INT_TYPE)
+        return g_array_index(list->list_props->ob_aval, object_t *,slice->int_props->ob_ival);
+    if (slice->type != SLICE_TYPE) {
+        set_exception("Type should be int or slice\n");
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
+    printd("Creating slice list\n");
+    object_t *sl_list = new_list_internal();
+    for (int i = slice->slice_props->start; i < slice->slice_props->stop && i < list->list_props->ob_aval->len && list >= 0; i += slice->slice_props->step) {
+        printd("Adding item to slice list %d\n", i);
+        object_t *item = g_array_index(list->list_props->ob_aval, object_t*, i);
+        g_array_append_val(sl_list->list_props->ob_aval, item);
+    }
+    return sl_list;
+}
+
 object_t *new_list_internal() {
     object_t* list = new_object(LIST_TYPE);
     list->list_props = malloc(sizeof(struct list_type));
@@ -86,6 +107,7 @@ void init_list() {
     object_t *list_class = new_class(strdup("list"));
     list_class->class_props->ob_func = new_list;
     object_add_field(list_class, "__iter__", new_func(list_iter_func, strdup("__iter__")));
+    object_add_field(list_class, "__getitem__", new_func(list_getitem_func, strdup("__getitem__")));
     object_add_field(list_class, "append", new_func(list_append, strdup("append")));
     object_add_field(list_class, "extend", new_func(list_extend, strdup("extend")));
     register_global(strdup("list"), list_class);

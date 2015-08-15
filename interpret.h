@@ -20,6 +20,7 @@
 #define THREAD_TYPE 10
 #define BOOL_TYPE 11
 #define NONE_TYPE 12
+#define SLICE_TYPE 13
 
 #define set_exception(fmt, args...) \
         {char *msg; asprintf(&msg, fmt, ##args); struct py_thread *mt = g_array_index(interpreter.threads, struct py_thread*, 0); mt->exc_msg = msg;}

@@ -85,6 +85,10 @@ thread.run()\n", &tree);
     else:\n\
         return recsum(n-1, sum+n)\n\
 print(recsum(10, 0))", &tree);
+    test_interpret_block(
+"l = [1,2,3,4,5,6,7,8]\n\
+for i in l[1:10:2]:\n\
+    print(i)\n", &tree);
     return 0;
 }
 

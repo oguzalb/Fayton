@@ -647,8 +647,22 @@ atom_t *parse_power(struct t_tokenizer *tokenizer) {
     }
     if (top_trailer == NULL)
         return atom;
-    add_child_atom(top_trailer, atom);
-    switch_children_atom(top_trailer);
+    if (top_trailer->type == A_ACCESSOR || (top_trailer->type == A_FUNCCALL && strcmp(top_trailer->value, "slicecall"))) {
+        add_child_atom(top_trailer, atom);
+        switch_children_atom(top_trailer);
+    } else {
+// SLICE
+        atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
+        add_child_atom(accessor, atom);
+        atom_t *getitem = new_atom(strdup("__getitem__"), A_VAR);
+        add_child_atom(accessor, getitem);
+        atom_t *funccall = new_atom(strdup("()call"), A_FUNCCALL);
+        add_child_atom(funccall, accessor);
+        atom_t *params = new_atom(strdup("params"), A_PARAMS);
+        add_child_atom(funccall, params);
+        add_child_atom(params, top_trailer);
+        top_trailer = funccall;
+    }
     while (trailer = parse_trailer(tokenizer)) {
         if (tokenizer->error == PARSE_ERROR) {
             printf("PARSE_POWER ERROR\n");

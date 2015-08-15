@@ -17,7 +17,7 @@ object_t *new_slice(GArray *args) {
 }
 
 object_t *new_slice_internal(int start, int stop, int step) {
-    object_t *slice_obj = new_object(INT_TYPE);
+    object_t *slice_obj = new_object(SLICE_TYPE);
     slice_obj->slice_props = malloc(sizeof(struct slice_type));
     slice_obj->slice_props->start = start;
     slice_obj->slice_props->stop = stop;

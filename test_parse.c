@@ -398,6 +398,18 @@ else:\n\
         VAR:print\n\
         PARAMS:params\n\
           STRING:a * 3 equals to 9\n", &tree);
+    test_parse_func_basic("l[1:3:1]",
+"FUNCCALL:()call\n\
+  ACCESSOR:.\n\
+    VAR:l\n\
+    VAR:__getitem__\n\
+  PARAMS:params\n\
+    FUNCCALL:slicecall\n\
+      VAR:slice\n\
+      PARAMS:params\n\
+        INTEGER:1\n\
+        INTEGER:3\n\
+        INTEGER:1\n", &tree, parse_expr); 
     test_parse_block("d = a.b.c[1:2:3][1]", 
 "BLOCK:block\n\
   ASSIGNMENT:=\n\
