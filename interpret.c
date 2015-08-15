@@ -2,19 +2,20 @@
 
 char *object_type_name(int type) {
     switch(type) {
-        case 1: return "INT";
-        case 2: return "STR";
-        case 3: return "CLASS";
-        case 4: return "FUNC";
-        case 5: return "LIST";
-        case 6: return "LISTITERATOR";
-        case 7: return "USERFUNC";
-        case 8: return "DICTIONARY";
-        case 9: return "CUSTOMOBJECT";
-        case 10: return "THREAD";
-        case 11: return "BOOL";
-        case 12: return "NONE";
-        case 13: return "SLICE";
+        case INT_TYPE: return "INT";
+        case STR_TYPE: return "STR";
+        case CLASS_TYPE: return "CLASS";
+        case FUNC_TYPE: return "FUNC";
+        case LIST_TYPE: return "LIST";
+        case LISTITERATOR_TYPE: return "LISTITERATOR";
+        case USERFUNC_TYPE: return "USERFUNC";
+        case DICTIONARY_TYPE: return "DICTIONARY";
+        case CUSTOMOBJECT_TYPE: return "CUSTOMOBJECT";
+        case THREAD_TYPE: return "THREAD";
+        case BOOL_TYPE: return "BOOL";
+        case NONE_TYPE: return "NONE";
+        case SLICE_TYPE: return "SLICE";
+        case GENERATORFUNC_TYPE: return "GENERATORFUNC";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -126,6 +127,15 @@ object_t *new_user_func(atom_t *func, char* name) {
     func_obj->userfunc_props = malloc(sizeof(struct userfunc_type));
     func_obj->userfunc_props->ob_userfunc = func;
     func_obj->userfunc_props->name = name;
+    func_obj->class = NULL;
+    return func_obj;
+}
+
+object_t *new_generator_func(atom_t *func, char* name) {
+    object_t *func_obj = new_object(GENERATORFUNC_TYPE);
+    func_obj->generatorfunc_props = malloc(sizeof(struct generatorfunc_type));
+    func_obj->generatorfunc_props->ob_generatorfunc = func;
+    func_obj->generatorfunc_props->name = name;
     func_obj->class = NULL;
     return func_obj;
 }
@@ -305,6 +315,10 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
     }
     if (func->type != FUNC_TYPE && func->type != USERFUNC_TYPE && func->type != CLASS_TYPE) {
         set_exception("OBJ IS NOT CALLABLE %s\n", object_type_name(func->type));
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    } else if (func->type == GENERATORFUNC_TYPE) {
+        set_exception("GENERATORFUNC NOT IMPLEMENTED YET %s\n", object_type_name(func->type));
         interpreter.error = RUN_ERROR;
         return NULL;
     }
@@ -586,6 +600,9 @@ printd("A_WHILE\n");
     } else if (stmt->type == A_FUNCDEF) {
         object_t *userfunc = new_user_func(stmt, stmt->value);
         register_global(stmt->value, userfunc);
+    } else if (stmt->type == A_GENFUNCDEF) {
+        object_t *generatorfunc = new_generator_func(stmt, stmt->value);
+        register_global(stmt->value, generatorfunc);
     } else if (stmt->type == A_CLASS) {
         atom_t *class_name = stmt;
         object_t *class = new_class(strdup(class_name->value));
@@ -597,6 +614,9 @@ printd("A_WHILE\n");
                 object_t *class_func = new_user_func(field, field->value);
                 object_add_field(class, field->value, class_func);
                 printd("added class field func %s.%s\n", class_name->value, field->value);
+            } else if (stmt->type == A_GENFUNCDEF) {
+                object_t *generatorfunc = new_generator_func(stmt, stmt->value);
+                object_add_field(class, field->value, generatorfunc);
             } else if (field->type == A_VAR) {
                 object_t *result = interpret_expr(field->child, context, current_indent);
                 object_add_field(class, field->value, result);

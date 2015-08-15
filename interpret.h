@@ -22,6 +22,7 @@
 #define BOOL_TYPE 11
 #define NONE_TYPE 12
 #define SLICE_TYPE 13
+#define GENERATORFUNC_TYPE 14
 
 pthread_key_t py_thread_key;
 
@@ -69,6 +70,12 @@ struct userfunc_type {
     char *name;
 };
 
+struct generatorfunc_type {
+    atom_t *ob_generatorfunc;
+    GThread *ob_thread;
+    char *name;
+};
+
 struct class_type {
 // TODO CHAIN
     struct _object *inherits;
@@ -96,6 +103,7 @@ typedef struct _object {
         struct func_type *func_props;
         struct class_type *class_props;
         struct userfunc_type *userfunc_props;
+        struct generatorfunc_type *generatorfunc_props;
         struct listiterator_type *listiterator_props;
         struct slice_type *slice_props;
     };
