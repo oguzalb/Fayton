@@ -434,6 +434,35 @@ else:\n\
         VAR:__getitem__\n\
       PARAMS:params\n\
         INTEGER:1\n", &tree);
+    test_parse_block("def func():\n\    yield a", 
+"BLOCK:block\n\
+  GENFUNCDEF:func\n\
+    PARAMS:params\n\
+    BLOCK:block\n\
+      YIELD:yield\n\
+        VAR:a\n", &tree);
+    test_parse_block("def func():\n\    while True:\n\        yield a", 
+"BLOCK:block\n\
+  GENFUNCDEF:func\n\
+    PARAMS:params\n\
+    BLOCK:block\n\
+      WHILE:WHILE\n\
+        VAR:True\n\
+        BLOCK:block\n\
+          YIELD:yield\n\
+            VAR:a\n", &tree);
+    test_parse_block("def func():\n\    def func2():\n\        yield a\n\    return 1",
+"BLOCK:block\n\
+  FUNCDEF:func\n\
+    PARAMS:params\n\
+    BLOCK:block\n\
+      GENFUNCDEF:func2\n\
+        PARAMS:params\n\
+        BLOCK:block\n\
+          YIELD:yield\n\
+            VAR:a\n\
+      RETURN:return\n\
+        INTEGER:1\n", &tree);
     //fclose(stream);
     return 0;
     //fclose(fp);

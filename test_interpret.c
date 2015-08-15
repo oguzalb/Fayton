@@ -31,7 +31,37 @@ void test_interpret_block(char *code, atom_tree_t *tree) {
     init_interpreter();
     printd("interpreting\n", buff);
     interpret_block(tree->root, interpreter.globals, 0);
+    if (interpreter.error == RUN_ERROR) {
+        struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
+        print_stack_trace(main_thread);
+        g_array_free(main_thread->stack_trace, FALSE);
+    }
     assert(interpreter.error != RUN_ERROR);
+    g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
+    free_atom_tree(tree->root);
+}
+
+void test_interpret_block_fail(char *code, atom_tree_t *tree) {
+    FILE *stream;
+    stream = fmemopen(code, strlen(code), "r");
+    struct t_tokenizer *tokenizer = new_tokenizer();
+    int success = tokenize_stream(stream, tree, tokenizer);
+    assert(tokenizer->error != PARSE_ERROR);
+    tree->root = parse_block(tokenizer, -1);
+    assert(tokenizer->error != PARSE_ERROR);
+    free_tokenizer(tokenizer);
+    char buff[2048];
+    buff[0] = '\0';
+    print_atom(tree->root, buff, 0, FALSE);
+    printf("%s\n", buff);
+    printd("initializing interpreter\n", buff);
+    init_interpreter();
+    printd("interpreting\n", buff);
+    interpret_block(tree->root, interpreter.globals, 0);
+    assert(interpreter.error == RUN_ERROR);
+    struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
+    print_stack_trace(main_thread);
+    g_array_free(main_thread->stack_trace, FALSE);
     g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
     free_atom_tree(tree->root);
 }
@@ -89,6 +119,15 @@ print(recsum(10, 0))", &tree);
 "l = [1,2,3,4,5,6,7,8]\n\
 for i in l[1:10:2]:\n\
     print(i)\n", &tree);
+    test_interpret_block_fail(
+"def func():\n\
+    return a\n\
+func()\n", &tree);
+    test_interpret_block(
+"a = 5\n\
+while a == 5:\n\
+    a = 4\n\
+    print(a)\n", &tree);
     return 0;
 }
 

@@ -232,9 +232,23 @@ struct py_thread *new_thread_struct() {
     return thread;
 }
 
+void local_storage_destructor(int *value) {
+}
+
 void init_interpreter() {
     interpreter.error = 0;
     interpreter.last_accessed = NULL;
+
+// TODO when threads get implemented
+    int *p = malloc(sizeof(int));
+    *p = 0;
+    pthread_key_create(&py_thread_key, local_storage_destructor);
+    pthread_setspecific(py_thread_key, p);
+// TODO when destroy_interpreter or destroy_thread gets implemented
+//   int *index = pthread_getspecific(py_thread_key);
+//   free(index);
+//   pthread_setspecific(py_thread_key, NULL);
+  
     interpreter.globals = g_hash_table_new(g_str_hash, g_str_equal);
     interpreter.threads = g_array_new(TRUE, TRUE, sizeof(struct py_thread *));
     struct py_thread *main_thread = new_thread_struct();
@@ -404,10 +418,32 @@ object_t *interpret_dict(atom_t *expr, GHashTable *context, int current_indent) 
     return dict;
 }
 
+object_t *interpret_while(atom_t *expr, GHashTable *context, int current_indent) {
+    atom_t *condition = expr->child;
+    atom_t *block = expr->child->next;
+// TODO give it to bool
+    object_t *bool_obj;
+    object_t *ret = NULL;
+    while (bool_obj = interpret_expr(condition, context, current_indent)) {
+        if (bool_obj->type != BOOL_TYPE) {
+            set_exception("NOT A BOOL TYPE\n");
+            interpreter.error = RUN_ERROR;
+            return NULL;
+        }
+        if (bool_obj->bool_props->ob_bval == FALSE)
+            return ret;
+        ret = interpret_block(block, context, current_indent);
+        if (ret != NULL)
+            return ret;
+    }
+    return NULL;
+}
+
 object_t *interpret_if(atom_t *expr, GHashTable *context, int current_indent) {
     atom_t *if_block = expr->child;
     while (if_block) {
         if (if_block->type == A_FUNCCALL) {
+// TODO give it to bool
             object_t *bool_obj = interpret_expr(if_block, context, current_indent);
             if (interpreter.error == RUN_ERROR)
                 return NULL;
@@ -538,13 +574,15 @@ object_t *interpret_stmt(atom_t *stmt, GHashTable *context, int current_indent) 
             register_global(var_name->value, item);
             interpret_block(block, context, current_indent);
             if (interpreter.error == RUN_ERROR) {
-                set_exception("ERROR OCCURED WHILE FOR STMTS\n");
                 return NULL;
             }
         }
     } else if (stmt->type == A_IF) { 
 printd("A_IF\n");
         return interpret_if(stmt, context, current_indent);
+    } else if (stmt->type == A_WHILE) { 
+printd("A_WHILE\n");
+        return interpret_while(stmt, context, current_indent);
     } else if (stmt->type == A_FUNCDEF) {
         object_t *userfunc = new_user_func(stmt, stmt->value);
         register_global(stmt->value, userfunc);
@@ -586,6 +624,9 @@ printd("A_IF\n");
             return interpret_expr(stmt->child, context, current_indent);
         else
             return new_none_internal();
+    } else {
+        interpreter.error = RUN_ERROR;
+        set_exception("UNKNOWN ATOM %s\n", atom_type_name(stmt->type));
     }
     return NULL;
 }

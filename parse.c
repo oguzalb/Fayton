@@ -113,7 +113,8 @@ char *atom_type_name(int type) {
         case A_SHIFTL: return "LSHIFT";
         case A_STRING: return "STRING";
         case A_IF: return "IF";
-        case A_SLICE: return "SLICE";
+        case A_YIELD: return "YIELD";
+        case A_GENFUNCDEF: return "GENFUNCDEF";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -330,6 +331,17 @@ atom_t *parse_var(struct t_tokenizer *tokenizer, atom_t *prev_arg) {
     }
 }
 
+atom_t *parse_yield(struct t_tokenizer *tokenizer) {
+    atom_t *yield = new_atom(strdup("yield"), A_YIELD);
+    if ((*tokenizer->iter)->type == T_EOL)
+        return yield;
+    atom_t *val = parse_comp(tokenizer);
+    if (tokenizer->error == PARSE_ERROR)
+        return NULL;
+    add_child_atom(yield, val);
+    return yield;
+}
+
 atom_t *parse_return(struct t_tokenizer *tokenizer) {
     atom_t *ret = new_atom(strdup("return"), A_RETURN);
     if ((*tokenizer->iter)->type == T_EOL)
@@ -422,8 +434,6 @@ printf("PARSE_GETITEM COLUMN ERR %s %s\n", token->value, token_type_name(token->
         prev_arg = arg;
     }
 }
-
-
 
 atom_t *parse_list(struct t_tokenizer *tokenizer) {
 printd("PARSE_LIST START\n");
@@ -880,6 +890,18 @@ atom_t *parse_params(struct t_tokenizer *tokenizer) {
     return params;
 }
 
+int block_has_yield(atom_t *atom) {
+    atom_t *child = atom->child;
+    if (atom->type == A_FUNCDEF || atom->type == A_GENFUNCDEF)
+        return FALSE;
+    int children_has = FALSE;
+    while(child) {
+        children_has |= block_has_yield(child);
+        child = child->next;
+    }
+    return atom->type == A_YIELD | children_has;
+}
+
 atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
     struct t_token * func_name = *tokenizer->iter;
     if (func_name == NULL || func_name->type != T_IDENTIFIER) {
@@ -909,17 +931,16 @@ atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
         return NULL;
     }
     tokenizer->iter++;
-    atom_t *funcdef = new_atom(strdup(func_name->value), A_FUNCDEF);
-    if (tokenizer->error == PARSE_ERROR) {
-        free_atom_tree(params);
-        return NULL;
-    }
     atom_t *block = parse_block(tokenizer, current_indent);
     if (tokenizer->error == PARSE_ERROR) {
         free_atom_tree(params);
-        free_atom_tree(funcdef);
         return NULL;
     }
+    atom_t *funcdef;
+    if (block_has_yield(block) == TRUE)
+        funcdef = new_atom(strdup(func_name->value), A_GENFUNCDEF);
+    else
+        funcdef = new_atom(strdup(func_name->value), A_FUNCDEF);
     add_child_atom(funcdef, params);
     add_child_atom(funcdef, block);
     return funcdef;
@@ -928,11 +949,14 @@ atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
 atom_t *parse_class(struct t_tokenizer *, int);
 atom_t *parse_if(struct t_tokenizer *, int);
 atom_t *parse_for(struct t_tokenizer *, int);
+atom_t *parse_while(struct t_tokenizer *, int);
 atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
     printd("PARSE_STMT_ASSG %s:\n", (*tokenizer->iter)->value);
     struct t_token *token = *tokenizer->iter;
     if (token == NULL || token->type != T_IDENTIFIER) {
         printf("PARSE_STMT ASSG IDENTIFIER ERR\n");
+        if (token != NULL)
+            printf("%s:%s\n", token_type_name(token->type), token->value);
         tokenizer->error = PARSE_ERROR;
         return NULL;
     }
@@ -941,9 +965,16 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
         printd("Have seen a return\n");
         tokenizer->iter++;
         stmt = parse_return(tokenizer);
+    } else if (!strncmp(token->value, "yield", 5)) {
+        printd("Have seen a yield\n");
+        tokenizer->iter++;
+        stmt = parse_yield(tokenizer);
     } else if (!strcmp(token->value, "for")) {
         tokenizer->iter++;
         stmt = parse_for(tokenizer, current_indent);
+    } else if (!strcmp(token->value, "while")) {
+        tokenizer->iter++;
+        stmt = parse_while(tokenizer, current_indent);
     } else if (!strcmp(token->value, "if")) {
         tokenizer->iter++;
         stmt = parse_if(tokenizer, current_indent);
@@ -1042,6 +1073,8 @@ printd("%s\n", (*tokenizer->iter)->value);
         indent = *tokenizer->iter;
         if (indent != NULL && indent->type == T_INDENT) {
             start_count = *indent->value;
+            if (count == start_count)
+                tokenizer->iter++;
         } else
             start_count = 0;
     }
@@ -1177,6 +1210,40 @@ atom_t *parse_for(struct t_tokenizer *tokenizer, int current_indent) {
     return for_loop;
 }
 
+atom_t *parse_while(struct t_tokenizer *tokenizer, int current_indent) {
+    struct t_token *var_name = *tokenizer->iter;
+    atom_t *expr = parse_comp(tokenizer);
+    if (expr == NULL || tokenizer->error == PARSE_ERROR) {
+        printf("PARSE_FOR expr\n");
+        tokenizer->error = PARSE_ERROR;
+        return NULL;
+    }
+    struct t_token *column = *tokenizer->iter;
+    if (column == NULL || column->type != T_COLUMN) {
+        printf("PARSE_FOR column\n");
+        free_atom_tree(expr);
+        tokenizer->error = PARSE_ERROR;
+        return NULL;
+    }
+    tokenizer->iter++;
+    struct t_token *eol = *tokenizer->iter;
+    if (eol == NULL || eol->type != T_EOL) {
+        printf("PARSE_FOR not eol\n");
+        free_atom_tree(expr);
+        tokenizer->error = PARSE_ERROR;
+        return NULL;
+    }
+    tokenizer->iter++;
+    atom_t *while_loop = new_atom(strdup("WHILE"), A_WHILE);
+    add_child_atom(while_loop, expr);
+    atom_t *block = parse_block(tokenizer, current_indent);
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(while_loop);
+    }
+    add_child_atom(while_loop, block);
+    return while_loop;
+}
+
 atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
    //TODO TODO  INDENT!?!
     struct t_token *class_name = *tokenizer->iter;
@@ -1271,6 +1338,7 @@ atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
             printd("PARSED CLASS FIELD\n");
         }
         indent = (*tokenizer->iter);
+printf("%s\n\n\n\n\n", indent->value);
         if (indent == NULL || indent->type != T_INDENT)
             break;
         count = *indent->value;
