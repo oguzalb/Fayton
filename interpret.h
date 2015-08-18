@@ -26,9 +26,6 @@
 
 pthread_key_t py_thread_key;
 
-#define set_exception(fmt, args...) \
-        {char *msg; int *index = pthread_getspecific(py_thread_key); printf("%d\n", *index);asprintf(&msg, fmt, ##args); struct py_thread *mt = g_array_index(interpreter.threads, struct py_thread*, *index); mt->exc_msg = msg;}
-
 #define RUN_ERROR 1
 
 struct int_type {
@@ -73,6 +70,10 @@ struct userfunc_type {
 struct generatorfunc_type {
     atom_t *ob_generatorfunc;
     GThread *ob_thread;
+    struct py_thread *gen_py_thread;
+    GCond *cond;
+    GMutex *mutex;
+    struct _object *channel;
     char *name;
 };
 
@@ -111,6 +112,8 @@ typedef struct _object {
 
 struct py_thread {
     GArray *stack_trace;
+    object_t *generator_channel;
+    object_t *generator;
     char * exc_msg;
 };
 
@@ -132,6 +135,13 @@ object_t *get_global(char*);
 object_t *get_global_no_check(char*);
 object_t *new_class(char*);
 void print_var(char*, object_t*);
+#define set_exception(fmt, args...) \
+    {char *msg; struct py_thread *mt = get_thread(); asprintf(&msg, fmt, ##args); mt->exc_msg = msg;}
+
+struct py_thread *get_thread();
+struct py_thread *new_thread_struct();
+
+
 
 #include "types/object.h"
 #include "types/int.h"

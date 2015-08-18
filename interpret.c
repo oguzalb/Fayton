@@ -23,6 +23,12 @@ char *object_type_name(int type) {
 
 #define FUNC_STRUCT_TYPE(x) object_t *(*x)(GArray *)
 
+struct py_thread * get_thread() {
+    int *index = pthread_getspecific(py_thread_key);
+    printd("%d got thread key\n", *index);
+    return g_array_index(interpreter.threads, struct py_thread *, *index);
+}
+
 void print_stack_trace(struct py_thread *thread) {
     GArray *stack_trace = thread->stack_trace;
     printf("stack trace:\n");
@@ -239,6 +245,7 @@ object_t *print_func(GArray *args) {
 struct py_thread *new_thread_struct() {
     struct py_thread *thread = malloc(sizeof(struct py_thread));
     thread->stack_trace = g_array_new(TRUE, TRUE, sizeof(char *));
+    thread->generator = NULL;
     return thread;
 }
 
@@ -280,6 +287,7 @@ void init_interpreter() {
     init_dict();
 
     init_thread();
+    init_generator();
 
     register_global(strdup("print"), new_func(print_func, strdup("print")));
 }
@@ -313,12 +321,8 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
         interpreter.error = RUN_ERROR;
         return NULL;
     }
-    if (func->type != FUNC_TYPE && func->type != USERFUNC_TYPE && func->type != CLASS_TYPE) {
+    if (func->type != FUNC_TYPE && func->type != USERFUNC_TYPE && func->type != CLASS_TYPE && func->type != GENERATORFUNC_TYPE) {
         set_exception("OBJ IS NOT CALLABLE %s\n", object_type_name(func->type));
-        interpreter.error = RUN_ERROR;
-        return NULL;
-    } else if (func->type == GENERATORFUNC_TYPE) {
-        set_exception("GENERATORFUNC NOT IMPLEMENTED YET %s\n", object_type_name(func->type));
         interpreter.error = RUN_ERROR;
         return NULL;
     }
@@ -348,7 +352,7 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
             g_array_append_val(args, value);
             param = param->next;
         }
-    } else if (func->type == USERFUNC_TYPE) {
+    } else if (func->type == USERFUNC_TYPE || func->type == GENERATORFUNC_TYPE) {
         atom_t *param = func_call->child->next->child;
         atom_t *param_name = func->userfunc_props->ob_userfunc->child->child;
         if (func_call->child->type == A_ACCESSOR && interpreter.last_accessed != NULL) {
@@ -377,24 +381,28 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
     }
     printd("ADDED PARAMS\n");
     printd("calling func type %s\n", object_type_name(func->type));
-    struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
+    struct py_thread *thread = get_thread();
     char* func_name;
     object_t *result;
     if (func->type == USERFUNC_TYPE) {
         func_name = strdup(func->userfunc_props->name);
-        g_array_append_val(main_thread->stack_trace, func_name);
+        g_array_append_val(thread->stack_trace, func_name);
         result = interpret_block(func->userfunc_props->ob_userfunc->child->next, sub_context, current_indent);
+    } else if (func->type == GENERATORFUNC_TYPE) {
+        func_name = strdup(func->generatorfunc_props->name);
+        g_array_append_val(thread->stack_trace, func_name);
+        result = new_generator_internal(args, context, func->generatorfunc_props->ob_generatorfunc);
     } else if (func->type == FUNC_TYPE) {
         func_name = strdup(func->func_props->name);
-        g_array_append_val(main_thread->stack_trace, func_name);
+        g_array_append_val(thread->stack_trace, func_name);
         result = func->func_props->ob_func(args);
     } else if (func->type == CLASS_TYPE) {
         func_name = strdup(func->class_props->name);
-        g_array_append_val(main_thread->stack_trace, func_name);
+        g_array_append_val(thread->stack_trace, func_name);
         result = func->class_props->ob_func(args);
     }
     if (interpreter.error != RUN_ERROR) {
-        g_array_remove_index(main_thread->stack_trace, main_thread->stack_trace->len - 1);
+        g_array_remove_index(thread->stack_trace, thread->stack_trace->len - 1);
         free(func_name);
     }
     return result;
@@ -644,6 +652,22 @@ printd("A_WHILE\n");
             return interpret_expr(stmt->child, context, current_indent);
         else
             return new_none_internal();
+    } else if (stmt->type == A_YIELD) {
+        printd("yielding something\n");
+        struct py_thread *thread = get_thread();
+        if (stmt->child)
+            thread->generator_channel = interpret_expr(stmt->child, context, current_indent);
+        else
+            thread->generator_channel = new_none_internal();
+        GCond *cond = thread->generator->generatorfunc_props->cond;
+        GMutex *mutex = thread->generator->generatorfunc_props->mutex;
+        g_mutex_lock(mutex);
+        printd("signalling %p from yield (gen thread)\n", cond);
+        g_cond_signal(cond);
+        printd("waiting %p from yield (gen thread)\n", cond);
+        g_cond_wait(cond, mutex);
+        g_mutex_unlock(mutex);
+        printd("passed yield wait (gen thread)\n");
     } else {
         interpreter.error = RUN_ERROR;
         set_exception("UNKNOWN ATOM %s\n", atom_type_name(stmt->type));
@@ -670,5 +694,15 @@ object_t *interpret_block(atom_t *block, GHashTable *context, int current_indent
         if (ret != NULL)
             return ret;
     } while (stmt = stmt->next);
+    struct py_thread *thread = get_thread();
+    if (thread->generator != NULL) {
+        thread->generator_channel = NULL;
+        GMutex *mutex = thread->generator->generatorfunc_props->mutex;
+        GCond *cond = thread->generator->generatorfunc_props->cond;
+        printd("signalling %p from block end (gen thread)\n", cond);
+        g_mutex_lock(mutex);
+        g_cond_signal(thread->generator->generatorfunc_props->cond);
+        g_mutex_unlock(mutex);
+    }
     return new_none_internal();
 }

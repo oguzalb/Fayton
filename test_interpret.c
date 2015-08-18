@@ -128,6 +128,12 @@ func()\n", &tree);
 while a == 5:\n\
     a = 4\n\
     print(a)\n", &tree);
+    test_interpret_block(
+"def func():\n\
+    yield 1\n\
+    yield 2\n\
+for i in func():\n\
+    print(i)\n", &tree);
     return 0;
 }
 
