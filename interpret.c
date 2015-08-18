@@ -606,10 +606,10 @@ printd("A_IF\n");
 printd("A_WHILE\n");
         return interpret_while(stmt, context, current_indent);
     } else if (stmt->type == A_FUNCDEF) {
-        object_t *userfunc = new_user_func(stmt, stmt->value);
+        object_t *userfunc = new_user_func(stmt, strdup(stmt->value));
         register_global(stmt->value, userfunc);
     } else if (stmt->type == A_GENFUNCDEF) {
-        object_t *generatorfunc = new_generator_func(stmt, stmt->value);
+        object_t *generatorfunc = new_generator_func(stmt, strdup(stmt->value));
         register_global(stmt->value, generatorfunc);
     } else if (stmt->type == A_CLASS) {
         atom_t *class_name = stmt;
@@ -619,11 +619,15 @@ printd("A_WHILE\n");
         atom_t *field = stmt->child->next;
         while (field) {
             if (field->type == A_FUNCDEF) {
-                object_t *class_func = new_user_func(field, field->value);
+                char *trace_str;
+                asprintf(&trace_str, "%s.%s", class_name->value, field->value);
+                object_t *class_func = new_user_func(field, trace_str);
                 object_add_field(class, field->value, class_func);
                 printd("added class field func %s.%s\n", class_name->value, field->value);
-            } else if (stmt->type == A_GENFUNCDEF) {
-                object_t *generatorfunc = new_generator_func(stmt, stmt->value);
+            } else if (field->type == A_GENFUNCDEF) {
+                char *trace_str;
+                asprintf(&trace_str, "%s.%s", class_name->value, field->value);
+                object_t *generatorfunc = new_generator_func(field, trace_str);
                 object_add_field(class, field->value, generatorfunc);
             } else if (field->type == A_VAR) {
                 object_t *result = interpret_expr(field->child, context, current_indent);

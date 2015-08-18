@@ -1338,7 +1338,6 @@ atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
             printd("PARSED CLASS FIELD\n");
         }
         indent = (*tokenizer->iter);
-printf("%s\n\n\n\n\n", indent->value);
         if (indent == NULL || indent->type != T_INDENT)
             break;
         count = *indent->value;
