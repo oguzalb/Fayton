@@ -35,9 +35,24 @@ object_t *list_extend(GArray *args) {
     object_t *list2 = g_array_index(args, object_t*, 1);
     GArray *list2_ob_aval = list2->list_props->ob_aval;
     GArray *list_ob_aval = list->list_props->ob_aval;
-    if (list->type != LIST_TYPE) {
-        for (int i=0; g_array_index(list2_ob_aval, object_t*, i) != NULL; i++)
-            g_array_append_val(list_ob_aval, g_array_index(list2_ob_aval, object_t*, i));
+    if (list2->type != LIST_TYPE) {
+        set_exception("Second type is not list");
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
+    for (int i=0; g_array_index(list2_ob_aval, object_t*, i) != NULL; i++)
+        g_array_append_val(list_ob_aval, g_array_index(list2_ob_aval, object_t*, i));
+    return new_none_internal();
+}
+
+object_t *list_reverse(GArray *args) {
+    object_t *list = g_array_index(args, object_t*, 0);
+    GArray *list_ob_aval = list->list_props->ob_aval;
+    object_t **plast; object_t **p;
+    for (p=list_ob_aval->data, plast=p + (list_ob_aval->len-1); *p != *plast; p++, plast--) {
+        object_t *temp = *p;
+        *p = *plast;
+        *plast = temp;
     }
     return new_none_internal();
 }
@@ -49,6 +64,7 @@ object_t *list_add(GArray *args) {
     assert(list->type == LIST_TYPE);
     if (list2->type != LIST_TYPE) {
         set_exception("Second type is not list");
+        interpreter.error = RUN_ERROR;
         return NULL;
     }
     GArray *list3_ob_aval = list3->list_props->ob_aval;
@@ -147,5 +163,6 @@ void init_list() {
     object_add_field(list_class, "extend", new_func(list_extend, strdup("extend")));
     object_add_field(list_class, "__add__", new_func(list_add, strdup("__add__")));
     object_add_field(list_class, "pop", new_func(list_pop, strdup("pop")));
+    object_add_field(list_class, "reverse", new_func(list_reverse, strdup("reverse")));
     register_global(strdup("list"), list_class);
 }
