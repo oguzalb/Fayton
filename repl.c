@@ -1,6 +1,9 @@
 #include "parse.h"
 #include "interpret.h"
 
+#include <readline/readline.h>
+#include <readline/history.h>
+
 FILE *fmemopen (void *buf, size_t size, const char *opentype)
 {
     FILE *f;
@@ -15,20 +18,22 @@ FILE *fmemopen (void *buf, size_t size, const char *opentype)
 }
 
 char *read_input() {
-    char buff[1024];
-    buff[0]='\0';
+    char *buff = NULL;
     char *input = NULL;
-    int count = 1;
-    while (fgets(buff, 1023, stdin) != NULL) {
-        count += sizeof(char *) * 1023;
-        char *extended_input = realloc(input, count + 1);
-        if (input == NULL)
-            extended_input[0] = '\0';
+    char *prompt = ">>> ";
+    while ((buff = readline(prompt)) != NULL) {
+        add_history(buff);
+        char *extended_input;
+        if (input != NULL) {
+            asprintf(&extended_input, "%s%s\n", input, buff);
+            free(input);
+        } else {
+            asprintf(&extended_input, "%s\n", buff);
+            prompt = "    ";
+        }
         input = extended_input;
-        strncat(input, buff, 1023);
         // i know this is slow, but no need for optimization since it can't get faster than user's typing :)
-        if (input[strlen(input)-1] == '\n'
-            && strncmp(buff, "class ", 6)
+        if (strncmp(buff, "class ", 6)
             && strncmp(buff, "def ", 4)
             && strncmp(buff, "for ", 4)
             // needs to get improved
@@ -37,7 +42,7 @@ char *read_input() {
             && strncmp(buff, "else ", 5)
             && buff[0] != ' ')
             break;
-        buff[0]='\0';
+        free(buff);
     }
     return input;
 }

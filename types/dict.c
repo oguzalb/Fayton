@@ -14,6 +14,20 @@ object_t *dict_keys(GArray *args) {
     return keysobj;
 }
 
+object_t *dict_values(GArray *args) {
+    object_t *self = g_array_index(args, object_t*, 0);
+    GList *values = g_hash_table_get_values(self->dict_props->ob_dval);
+    object_t *valuesobj = new_list(NULL);
+    GList *iter = values;
+    while (iter != NULL) {
+        g_array_append_val(valuesobj->list_props->ob_aval, iter->data);
+        print_var("appending to values list", iter->data);
+        iter = iter->next;
+    }
+    g_list_free(values);
+    return valuesobj;
+}
+
 object_t *new_dict(GArray *args) {
     // TODO args check
     object_t * dict = new_object(DICTIONARY_TYPE);
@@ -28,5 +42,6 @@ void init_dict() {
     dict_class->class_props->ob_func = new_dict;
     //object_add_field(dict_class, "__iter__", new_func(iter_dict_func));
     object_add_field(dict_class, "keys", new_func(dict_keys, strdup("keys")));
+    object_add_field(dict_class, "values", new_func(dict_keys, strdup("values")));
     register_global(strdup("dict"), dict_class);
 }

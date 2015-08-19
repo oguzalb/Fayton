@@ -1,4 +1,4 @@
-LIBS=`pkg-config --cflags glib-2.0` `pkg-config --libs glib-2.0`
+LIBS=`pkg-config --cflags glib-2.0` `pkg-config --libs glib-2.0` -lreadline 
 FLAGS=-std=gnu99 -g
 DEBUG=
 TYPES=object.c int.c bool.c list.c dict.c str.c thread.c none.c slice.c generator.c

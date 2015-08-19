@@ -32,12 +32,33 @@ object_t *list_append(GArray *args) {
 
 object_t *list_extend(GArray *args) {
     object_t *list = g_array_index(args, object_t*, 0);
-    object_t *list2 = g_array_index(args, object_t*, 0);
+    object_t *list2 = g_array_index(args, object_t*, 1);
+    GArray *list2_ob_aval = list2->list_props->ob_aval;
+    GArray *list_ob_aval = list->list_props->ob_aval;
     if (list->type != LIST_TYPE) {
-        for (int i=0; g_array_index(args, object_t*, i) != NULL; i++)
-            g_array_append_val(args, g_array_index(args, object_t*, i));
+        for (int i=0; g_array_index(list2_ob_aval, object_t*, i) != NULL; i++)
+            g_array_append_val(list_ob_aval, g_array_index(list2_ob_aval, object_t*, i));
     }
     return new_none_internal();
+}
+
+object_t *list_add(GArray *args) {
+    object_t *list = g_array_index(args, object_t*, 0);
+    object_t *list2 = g_array_index(args, object_t*, 1);
+    object_t *list3 = new_list_internal();
+    assert(list->type == LIST_TYPE);
+    if (list2->type != LIST_TYPE) {
+        set_exception("Second type is not list");
+        return NULL;
+    }
+    GArray *list3_ob_aval = list3->list_props->ob_aval;
+    GArray *list2_ob_aval = list2->list_props->ob_aval;
+    GArray *list_ob_aval = list->list_props->ob_aval;
+    for (int i=0; g_array_index(list_ob_aval, object_t*, i) != NULL; i++)
+        g_array_append_val(list3_ob_aval, g_array_index(list_ob_aval, object_t*, i));
+    for (int i=0; g_array_index(list2_ob_aval, object_t*, i) != NULL; i++)
+        g_array_append_val(list3_ob_aval, g_array_index(list2_ob_aval, object_t*, i));
+    return list3;
 }
 
 object_t *list_append_internal(object_t *list, object_t *item) {
@@ -110,5 +131,6 @@ void init_list() {
     object_add_field(list_class, "__getitem__", new_func(list_getitem_func, strdup("__getitem__")));
     object_add_field(list_class, "append", new_func(list_append, strdup("append")));
     object_add_field(list_class, "extend", new_func(list_extend, strdup("extend")));
+    object_add_field(list_class, "__add__", new_func(list_add, strdup("__add__")));
     register_global(strdup("list"), list_class);
 }
