@@ -61,6 +61,20 @@ object_t *list_add(GArray *args) {
     return list3;
 }
 
+object_t *list_pop(GArray *args) {
+    object_t *self = g_array_index(args, object_t*, 0);
+    GArray *self_ob_aval = self->list_props->ob_aval;
+// Throw IndexError
+    if (self_ob_aval->len == 0) {
+        set_exception("IndexError");
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
+    object_t *last = g_array_index(self_ob_aval, object_t*, self_ob_aval->len-1);
+    g_array_remove_index(self_ob_aval, self_ob_aval->len-1);
+    return last;
+}
+
 object_t *list_append_internal(object_t *list, object_t *item) {
     g_array_append_val(list->list_props->ob_aval, item);
     return item;
@@ -132,5 +146,6 @@ void init_list() {
     object_add_field(list_class, "append", new_func(list_append, strdup("append")));
     object_add_field(list_class, "extend", new_func(list_extend, strdup("extend")));
     object_add_field(list_class, "__add__", new_func(list_add, strdup("__add__")));
+    object_add_field(list_class, "pop", new_func(list_pop, strdup("pop")));
     register_global(strdup("list"), list_class);
 }

@@ -443,8 +443,13 @@ printd("PARSE_LIST START\n");
         printf("PARSE_LIST PARSE_ERROR\n");
         return NULL;
     }
-    tokenizer->iter++;
     atom_t *list = new_atom(strdup("list"), A_LIST);
+    tokenizer->iter++;
+    token = *tokenizer->iter;
+    if (token->type == T_CBRACKET) {
+        tokenizer->iter++;
+        return list;
+    }
     atom_t *first_arg = parse_comp(tokenizer);
     add_child_atom(list, first_arg);
     atom_t *prev_arg = first_arg;
