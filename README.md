@@ -5,7 +5,7 @@ Currently in a very initial version with mem leaks all over the place since i do
 
 Things that -barely- work can be seen inside test_interpret.c
 
-Needs glibc-dev and readline library installed
+Needs glib-dev and readline library installed
 
 make all and everything is compiled
 
