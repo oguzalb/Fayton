@@ -37,8 +37,7 @@ struct list_type {
 };
 
 struct listiterator_type {
-    struct _object *ob_ob;
-    int ob_ival;
+    struct _object **objectp;
 };
 
 struct dict_type {
@@ -85,9 +84,9 @@ struct class_type {
 };
 
 struct slice_type {
-    int start;
-    int stop;
-    int step;
+    struct _object *start;
+    struct _object *stop;
+    struct _object *step;
 };
 
 typedef struct _object {

@@ -1,7 +1,11 @@
 #include "list.h"
 
+#define get_garray_begin(glist) \
+    ((object_t **) (void *) glist->data)
+#define get_garray_end(glist) \
+    (((object_t **) (void *) glist->data) + (glist->len-1))
+
 object_t *new_listiterator(GArray *args) {
-    // TODO args check
     object_t *list = g_array_index(args, object_t*, 0);
     return new_listiterator_internal(list);
 }
@@ -9,7 +13,10 @@ object_t *new_listiterator(GArray *args) {
 object_t *listiterator_next_func(GArray *args) {
     // TODO args check
     object_t *iterator = g_array_index(args, object_t*, 0);
-    return g_array_index(iterator->listiterator_props->ob_ob->list_props->ob_aval, object_t*, iterator->listiterator_props->ob_ival++);
+    object_t **objectp = iterator->listiterator_props->objectp;
+    if (*objectp != NULL)
+        iterator->listiterator_props->objectp++;;
+    return *objectp;
 }
 
 object_t *list_iter_func(GArray *args) {
@@ -49,7 +56,7 @@ object_t *list_reverse(GArray *args) {
     object_t *list = g_array_index(args, object_t*, 0);
     GArray *list_ob_aval = list->list_props->ob_aval;
     object_t **plast; object_t **p;
-    for (p=list_ob_aval->data, plast=p + (list_ob_aval->len-1); *p != *plast; p++, plast--) {
+    for (p=get_garray_begin(list_ob_aval), plast=get_garray_end(list_ob_aval); *p != *plast; p++, plast--) {
         object_t *temp = *p;
         *p = *plast;
         *plast = temp;
@@ -67,13 +74,13 @@ object_t *list_add(GArray *args) {
         interpreter.error = RUN_ERROR;
         return NULL;
     }
+    object_t **list_iter = get_garray_begin(list->list_props->ob_aval);
+    object_t **list2_iter = get_garray_begin(list2->list_props->ob_aval);
     GArray *list3_ob_aval = list3->list_props->ob_aval;
-    GArray *list2_ob_aval = list2->list_props->ob_aval;
-    GArray *list_ob_aval = list->list_props->ob_aval;
-    for (int i=0; g_array_index(list_ob_aval, object_t*, i) != NULL; i++)
-        g_array_append_val(list3_ob_aval, g_array_index(list_ob_aval, object_t*, i));
-    for (int i=0; g_array_index(list2_ob_aval, object_t*, i) != NULL; i++)
-        g_array_append_val(list3_ob_aval, g_array_index(list2_ob_aval, object_t*, i));
+    for (; *list_iter != NULL; list_iter++)
+        g_array_append_val(list3_ob_aval, *list_iter);
+    for (; *list2_iter != NULL; list2_iter++)
+        g_array_append_val(list3_ob_aval, *list2_iter);
     return list3;
 }
 
@@ -101,10 +108,9 @@ object_t *new_listiterator_internal(object_t *list) {
     printd("creating list iterator\n");
     object_t *listiterator = new_object(LISTITERATOR_TYPE);
     listiterator->listiterator_props = malloc(sizeof(struct listiterator_type));
-    listiterator->listiterator_props->ob_ob = list;
+    listiterator->listiterator_props->objectp = get_garray_begin(list->list_props->ob_aval);
     listiterator->class = get_global("listiterator");
     assert(listiterator->class != NULL);
-    listiterator->listiterator_props->ob_ival = 0;
     printd("created list iterator\n");
     return listiterator;
 }
@@ -114,18 +120,54 @@ object_t *list_getitem_func(GArray *args) {
     object_t *list = g_array_index(args, object_t *, 0);
     object_t *slice = g_array_index(args, object_t *, 1);
     if (slice->type == INT_TYPE)
-        return g_array_index(list->list_props->ob_aval, object_t *,slice->int_props->ob_ival);
+        return g_array_index(list->list_props->ob_aval, object_t *, slice->int_props->ob_ival);
     if (slice->type != SLICE_TYPE) {
         set_exception("Type should be int or slice\n");
         interpreter.error = RUN_ERROR;
         return NULL;
     }
     printd("Creating slice list\n");
+    object_t *none = new_none_internal();
+    object_t **glist_begin = get_garray_begin(list->list_props->ob_aval);
+    object_t **glist_end = get_garray_end(list->list_props->ob_aval);
+    object_t **glist_stop;
+    object_t **glist_start;
+    int step;
+    int stop;
+    if (slice->slice_props->step == none)
+        step = 1;
+    else
+        step = slice->slice_props->step->int_props->ob_ival;
+    if (slice->slice_props->start == none)
+        if (step < 0)
+            glist_start = get_garray_end(list->list_props->ob_aval);
+        else
+            glist_start = glist_begin;
+    else {
+        if (slice->slice_props->start->int_props->ob_ival < 0)
+           glist_start = glist_end - slice->slice_props->start->int_props->ob_ival + 1;
+        else
+           glist_start = glist_begin + slice->slice_props->start->int_props->ob_ival;
+    }
+    if (slice->slice_props->stop == none)
+        if (step < 0)
+            glist_stop = glist_begin - 1;
+        else
+            glist_stop = glist_end + 1;
+    else {
+        if (slice->slice_props->stop->int_props->ob_ival < 0)
+            glist_stop = glist_end - slice->slice_props->stop->int_props->ob_ival + 1;
+        else
+            glist_stop = glist_begin + slice->slice_props->stop->int_props->ob_ival;
+    }
+    if (step == 0) {
+        set_exception("Step can not be 0\n");
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
     object_t *sl_list = new_list_internal();
-    for (int i = slice->slice_props->start; i < slice->slice_props->stop && i < list->list_props->ob_aval->len && list >= 0; i += slice->slice_props->step) {
-        printd("Adding item to slice list %d\n", i);
-        object_t *item = g_array_index(list->list_props->ob_aval, object_t*, i);
-        g_array_append_val(sl_list->list_props->ob_aval, item);
+    for (;glist_start < glist_stop && glist_start > glist_begin; glist_start += step) {
+        g_array_append_val(sl_list->list_props->ob_aval, *glist_start);
     }
     return sl_list;
 }

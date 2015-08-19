@@ -5,18 +5,18 @@ object_t *new_slice(GArray *args) {
     object_t *start = g_array_index(args, object_t *, 1);
     object_t *stop = g_array_index(args, object_t *, 2);
     object_t *step = g_array_index(args, object_t *, 3);
-    if (start->type != INT_TYPE || stop->type != INT_TYPE || step->type != INT_TYPE) {
+    if ((start->type != INT_TYPE && start->type != NONE_TYPE) || (stop->type != INT_TYPE && stop->type != NONE_TYPE) || (step->type != INT_TYPE && step->type != NONE_TYPE)) {
         printd("NOT INT\n");
         interpreter.error = RUN_ERROR;
         return NULL;
     }
     return new_slice_internal(
-        start->int_props->ob_ival,
-        stop->int_props->ob_ival,
-        step->int_props->ob_ival);
+        start,
+        stop,
+        step);
 }
 
-object_t *new_slice_internal(int start, int stop, int step) {
+object_t *new_slice_internal(object_t *start, object_t *stop, object_t *step) {
     object_t *slice_obj = new_object(SLICE_TYPE);
     slice_obj->slice_props = malloc(sizeof(struct slice_type));
     slice_obj->slice_props->start = start;
