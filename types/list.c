@@ -29,11 +29,24 @@ object_t *list_append(GArray *args) {
     // TODO args check
     object_t *list = g_array_index(args, object_t*, 0);
     object_t *item = g_array_index(args, object_t*, 1);
-    if (list->type != LIST_TYPE) {
+    g_array_append_val(list->list_props->ob_aval, item);
+    return new_none_internal();
+}
+
+object_t *list_insert(GArray *args) {
+    object_t *list = g_array_index(args, object_t*, 0);
+    object_t *index = g_array_index(args, object_t*, 1);
+    object_t *item = g_array_index(args, object_t*, 2);
+    if (index->type != INT_TYPE) {
+        set_exception("Second type is not int");
         interpreter.error = RUN_ERROR;
         return NULL;
     }
-    g_array_append_val(list->list_props->ob_aval, item);
+    int i = index->int_props->ob_ival;
+    int len = list->list_props->ob_aval->len;
+    if (i > len)
+        i = len;
+    g_array_insert_val(list->list_props->ob_aval, i, item);
     return new_none_internal();
 }
 
@@ -203,6 +216,7 @@ void init_list() {
     object_add_field(list_class, "__getitem__", new_func(list_getitem_func, strdup("__getitem__")));
     object_add_field(list_class, "append", new_func(list_append, strdup("append")));
     object_add_field(list_class, "extend", new_func(list_extend, strdup("extend")));
+    object_add_field(list_class, "insert", new_func(list_insert, strdup("insert")));
     object_add_field(list_class, "__add__", new_func(list_add, strdup("__add__")));
     object_add_field(list_class, "pop", new_func(list_pop, strdup("pop")));
     object_add_field(list_class, "reverse", new_func(list_reverse, strdup("reverse")));
