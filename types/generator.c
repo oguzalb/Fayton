@@ -41,7 +41,7 @@ pthread_setspecific(py_thread_key, p);
     printd("waiting %p from thread_runner (gen thread)\n", gen_thread->generator->generatorfunc_props->cond);
     g_cond_wait(cond, mutex);
     g_mutex_unlock(mutex);
-    interpret_block(thread_data->generator->generatorfunc_props->ob_generatorfunc->child->next, thread_data->context, /* TODO */ 0);
+    interpret_funcblock(thread_data->generator->generatorfunc_props->ob_generatorfunc->child->next, thread_data->context, /* TODO */ 0);
 // StopIterationException when exceptions get fully implemented
 }
 

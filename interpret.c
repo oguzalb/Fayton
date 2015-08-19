@@ -166,6 +166,7 @@ guint object_hash(gconstpointer key) {
     return g_int_hash(&object->int_props->ob_ival);
 }
 
+object_t *interpret_funcblock(atom_t *, GHashTable *, int);
 object_t *sum_func(GArray *args) {
     object_t *iterable = g_array_index(args, object_t*, 0);
     object_t *iter_func = object_get_field(iterable, "__iter__");
@@ -176,7 +177,7 @@ object_t *sum_func(GArray *args) {
         GHashTable *sub_context = g_hash_table_new(g_str_hash, g_str_equal);
         atom_t *param_name = iter_func->userfunc_props->ob_userfunc->child->child;
         g_hash_table_insert(sub_context, param_name->value, iterable);
-        iterator = interpret_block(iter_func->userfunc_props->ob_userfunc->child->next, sub_context, /* TODO */0);
+        iterator = interpret_funcblock(iter_func->userfunc_props->ob_userfunc->child->next, sub_context, /* TODO */0);
     } else {
         GArray *args = g_array_new(TRUE, TRUE, sizeof(object_t *));
         g_array_append_val(args, iterable);
@@ -192,7 +193,7 @@ object_t *sum_func(GArray *args) {
             GHashTable *sub_context = g_hash_table_new(g_str_hash, g_str_equal);
             atom_t *param_name = next_func->userfunc_props->ob_userfunc->child->child;
             g_hash_table_insert(sub_context, param_name->value, iterator);
-            int_obj = interpret_block(next_func->userfunc_props->ob_userfunc->child->next, sub_context, /* TODO */ 0);
+            int_obj = interpret_funcblock(next_func->userfunc_props->ob_userfunc->child->next, sub_context, /* TODO */ 0);
         } else {
             GArray *args = g_array_new(TRUE, TRUE, sizeof(object_t *));
             g_array_append_val(args, iterator);
@@ -387,7 +388,7 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
     if (func->type == USERFUNC_TYPE) {
         func_name = strdup(func->userfunc_props->name);
         g_array_append_val(thread->stack_trace, func_name);
-        result = interpret_block(func->userfunc_props->ob_userfunc->child->next, sub_context, current_indent);
+        result = interpret_funcblock(func->userfunc_props->ob_userfunc->child->next, sub_context, current_indent);
     } else if (func->type == GENERATORFUNC_TYPE) {
         func_name = strdup(func->generatorfunc_props->name);
         g_array_append_val(thread->stack_trace, func_name);
@@ -698,6 +699,10 @@ object_t *interpret_block(atom_t *block, GHashTable *context, int current_indent
         if (ret != NULL)
             return ret;
     } while (stmt = stmt->next);
+    return NULL;
+}
+object_t *interpret_funcblock(atom_t *block, GHashTable *context, int current_indent) {
+    object_t *result = interpret_block(block, context, current_indent);
     struct py_thread *thread = get_thread();
     if (thread->generator != NULL) {
         thread->generator_channel = NULL;
@@ -708,5 +713,6 @@ object_t *interpret_block(atom_t *block, GHashTable *context, int current_indent
         g_cond_signal(thread->generator->generatorfunc_props->cond);
         g_mutex_unlock(mutex);
     }
-    return new_none_internal();
+    return result != NULL? result : new_none_internal();
 }
+

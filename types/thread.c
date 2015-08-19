@@ -12,7 +12,7 @@ object_t *thread_runner(struct thread_data_t *thread_data) {
     object_t *run_func = thread_data->func_obj;
     if (run_func->type == USERFUNC_TYPE) {
         GHashTable *sub_context = g_hash_table_new(object_hash, object_equal);
-        interpret_block(thread_data->func_obj->userfunc_props->ob_userfunc->child->next, sub_context, /* TODO */ 0);
+        interpret_funcblock(thread_data->func_obj->userfunc_props->ob_userfunc->child->next, sub_context, /* TODO */ 0);
         //g_hash_table_free(sub_context);
     } else
         run_func->func_props->ob_func(thread_data->args);
