@@ -193,6 +193,23 @@ object_t *new_list_internal() {
     return list;
 }
 
+object_t *list_repr(GArray *args) {
+    object_t *self = g_array_index(args, object_t *, 0);
+    char *str = NULL;
+    char *cursor = NULL;
+    cursor = fay_strcat(&str, "[", cursor);
+    object_t **obp;
+    for (obp=get_garray_begin(self->list_props->ob_aval); *obp != NULL; obp++) {
+        object_t *item_str = object_call_repr(*obp);
+        if (cursor != str+1)
+            cursor = fay_strcat(&str, ", ", cursor);
+        cursor = fay_strcat(&str, item_str->str_props->ob_sval->str, cursor);
+    }
+    cursor = fay_strcat(&str, "]", cursor);
+    object_t *repr = new_str_internal(str);
+    return repr;
+}
+
 object_t *new_list(GArray *args) {
     // TODO args check
     object_t *list;
@@ -218,6 +235,7 @@ void init_list() {
     object_add_field(list_class, "extend", new_func(list_extend, strdup("extend")));
     object_add_field(list_class, "insert", new_func(list_insert, strdup("insert")));
     object_add_field(list_class, "__add__", new_func(list_add, strdup("__add__")));
+    object_add_field(list_class, "__repr__", new_func(list_repr, strdup("__repr__")));
     object_add_field(list_class, "pop", new_func(list_pop, strdup("pop")));
     object_add_field(list_class, "reverse", new_func(list_reverse, strdup("reverse")));
     register_global(strdup("list"), list_class);

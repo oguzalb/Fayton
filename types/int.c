@@ -31,6 +31,14 @@ object_t *int_cmp_func(GArray *args) {
     return new_int_internal(left->int_props->ob_ival > right->int_props->ob_ival? 1:left->int_props->ob_ival == right->int_props->ob_ival?0:-1);
 }
 
+object_t *int_repr_func(GArray *args) {
+    object_t *self = g_array_index(args, object_t *, 0);
+    char *str;
+    asprintf(&str, "%d", self->int_props->ob_ival);
+    object_t *repr = new_str_internal(str);
+    return repr;
+}
+
 object_t *new_int(GArray *args) {
     printd("NEW INT\n");
     object_t *int_obj = g_array_index(args, object_t *, 1);
@@ -57,5 +65,6 @@ void init_int() {
     object_add_field(int_class, "__sub__", new_func(int_sub_func, strdup("__sub__")));
     object_add_field(int_class, "__cmp__", new_func(int_cmp_func, strdup("__cmp__")));
     object_add_field(int_class, "__eq__", new_func(object_equals, strdup("__eq__")));
+    object_add_field(int_class, "__repr__", new_func(int_repr_func, strdup("__repr__")));
     register_global(strdup("int"), int_class);
 }

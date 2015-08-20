@@ -28,6 +28,29 @@ object_t *dict_values(GArray *args) {
     return valuesobj;
 }
 
+object_t *dict_repr(GArray *args) {
+    GHashTableIter iter;
+    gpointer key, value;
+
+    object_t *self = g_array_index(args, object_t *, 0);
+    char *str = NULL;
+    char *cursor = NULL;
+    cursor = fay_strcat(&str, "{", cursor);
+    g_hash_table_iter_init (&iter, self->dict_props->ob_dval);
+    while (g_hash_table_iter_next (&iter, &key, &value)) {
+        if (cursor != str+1)
+            cursor = fay_strcat(&str, ", ", cursor);
+	object_t *key_str = object_call_repr((object_t *)(void*)key);
+        cursor = fay_strcat(&str, key_str->str_props->ob_sval->str, cursor);
+        cursor = fay_strcat(&str, ":", cursor);
+        object_t *value_str = object_call_repr((object_t*)(void*)value);
+        cursor = fay_strcat(&str, value_str->str_props->ob_sval->str, cursor);
+    }
+    cursor = fay_strcat(&str, "}", cursor);
+    object_t *repr = new_str_internal(str);
+    return repr;
+}
+
 object_t *new_dict(GArray *args) {
     // TODO args check
     object_t * dict = new_object(DICTIONARY_TYPE);
@@ -43,5 +66,6 @@ void init_dict() {
     //object_add_field(dict_class, "__iter__", new_func(iter_dict_func));
     object_add_field(dict_class, "keys", new_func(dict_keys, strdup("keys")));
     object_add_field(dict_class, "values", new_func(dict_keys, strdup("values")));
+    object_add_field(dict_class, "__repr__", new_func(dict_repr, strdup("__repr__")));
     register_global(strdup("dict"), dict_class);
 }

@@ -3,6 +3,7 @@
 
 void object_add_field(object_t *object, char* name, object_t *field);
 object_t *object_get_field(object_t *object, char* name);
+object_t *object_call_repr(object_t *object);
 object_t *object_equals(GArray *args);
 object_t *new_object_instance(GArray *args);
 object_t *new_object(int type);

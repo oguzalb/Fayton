@@ -15,6 +15,34 @@ object_t *new_object_instance(GArray *args) {
     return object;
 }
 
+object_t *object_call_repr(object_t *object) {
+   object_t *repr_func = object_get_field(object, "__repr__");
+   object_t *item_str;
+   if (repr_func->type == USERFUNC_TYPE) {
+        GHashTable *sub_context = g_hash_table_new(g_str_hash, g_str_equal);
+        g_hash_table_insert(sub_context, "self", object);
+        item_str = interpret_funcblock(repr_func->userfunc_props->ob_userfunc->child->next, sub_context, 0);
+        g_hash_table_destroy(sub_context);
+    } else if (repr_func->type == FUNC_TYPE) {
+        GArray *params = g_array_new(TRUE, TRUE, sizeof(object_t *));
+        g_array_append_val(params, object);
+        item_str = repr_func->func_props->ob_func(params);
+        g_array_free(params, FALSE);
+    } else {
+        set_exception("__repr__ should be a function returning string");
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
+    if (item_str->type != STR_TYPE) {
+        set_exception("__repr__ should be a function returning string");
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
+    return item_str;
+}
+
 object_t *object_equals(GArray *args) {
     object_t *left = g_array_index(args, object_t*, 0);
     object_t *right = g_array_index(args, object_t*, 1);
@@ -41,11 +69,13 @@ object_t *object_get_field(object_t *object, char* name) {
     if (field != NULL) { 
         return field;
     }
-    if (object->class == NULL) { 
-        assert(FALSE);
-    }
     printd("OBJECT FIELDS\n");
     g_hash_table_foreach(object->fields, print_var_each, NULL);
+    if (object->class == NULL) {
+        interpreter.error = RUN_ERROR;
+        set_exception("Field not found %s\n", name);
+        return NULL;
+    }
     field = g_hash_table_lookup(object->class->fields, name);
     if (field != NULL)
         return field;

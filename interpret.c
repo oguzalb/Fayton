@@ -157,7 +157,7 @@ gboolean object_equal(gconstpointer a, gconstpointer b) {
     g_array_append_val(sub_args, aobj);
     g_array_append_val(sub_args, bobj);
     object_t *equals = object_equals(sub_args);
-    return TRUE;
+    return equals->bool_props->ob_bval == TRUE;
 }
 
 guint object_hash(gconstpointer key) {
@@ -226,21 +226,11 @@ object_t *range_func(GArray *args) {
 }
 
 object_t *print_func(GArray *args) {
-    // TODO CHECKS AND FULL PRINT
-    object_t *var = g_array_index(args, object_t*, 0);
-    if (var->type == INT_TYPE) {
-        printd("PRINT INT\n");
-        printf("%d\n", var->int_props->ob_ival);
-    } else if (var->type == STR_TYPE) {
-        printf("%s\n", var->str_props->ob_sval->str);
-    } else if (var->type == BOOL_TYPE) {
-        printf("%s\n", var->bool_props->ob_bval ? "True":"False");
-    } else if (var->type == NONE_TYPE) {
-        printf("None\n");
-    } else {
-        printf("Print got %d!?!", var->type);
-        assert(FALSE);
-    }
+    object_t *obj = g_array_index(args, object_t*, 0);
+    object_t *obj_str = object_call_repr(obj);
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
+    printf("%s\n", obj_str->str_props->ob_sval->str);
 }
 
 struct py_thread *new_thread_struct() {

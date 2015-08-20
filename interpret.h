@@ -140,8 +140,7 @@ void print_var(char*, object_t*);
 struct py_thread *get_thread();
 struct py_thread *new_thread_struct();
 
-
-
+#include "utils.h"
 #include "types/object.h"
 #include "types/int.h"
 #include "types/bool.h"
