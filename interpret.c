@@ -77,7 +77,7 @@ object_t *new_class(char* name) {
     printd("Creating the class %s\n", name);
     cls = new_object(CLASS_TYPE);
     cls->class_props = malloc(sizeof(struct class_type));
-    cls->class_props->inherits = NULL;
+    cls->class_props->inherits = object_class;
     cls->class_props->name = name;
     return cls;
 }
@@ -227,7 +227,7 @@ object_t *range_func(GArray *args) {
 
 object_t *print_func(GArray *args) {
     object_t *obj = g_array_index(args, object_t*, 0);
-    object_t *obj_str = object_call_repr(obj);
+    object_t *obj_str = object_call_str(obj);
     if (interpreter.error == RUN_ERROR)
         return NULL;
     printf("%s\n", obj_str->str_props->ob_sval->str);

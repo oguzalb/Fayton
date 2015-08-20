@@ -1,5 +1,7 @@
 #include "object.h"
 
+object_t *object_class = NULL;
+
 object_t *new_object(int type) {
     object_t *object = (object_t *) malloc(sizeof(object_t));
     object->fields = g_hash_table_new(g_str_hash, g_str_equal);
@@ -15,28 +17,52 @@ object_t *new_object_instance(GArray *args) {
     return object;
 }
 
-object_t *object_call_repr(object_t *object) {
-   object_t *repr_func = object_get_field(object, "__repr__");
-   object_t *item_str;
-   if (repr_func->type == USERFUNC_TYPE) {
+object_t *object_call_func_no_param(object_t *object, char *func_name) {
+   object_t *func = object_get_field(object, func_name);
+   if (interpreter.error == RUN_ERROR)
+       return NULL;
+   object_t *result;
+   if (func->type == USERFUNC_TYPE || func->type == GENERATORFUNC_TYPE) {
         GHashTable *sub_context = g_hash_table_new(g_str_hash, g_str_equal);
         g_hash_table_insert(sub_context, "self", object);
-        item_str = interpret_funcblock(repr_func->userfunc_props->ob_userfunc->child->next, sub_context, 0);
+        result = interpret_funcblock(func->userfunc_props->ob_userfunc->child->next, sub_context, 0);
         g_hash_table_destroy(sub_context);
-    } else if (repr_func->type == FUNC_TYPE) {
+    } else if (func->type == FUNC_TYPE) {
         GArray *params = g_array_new(TRUE, TRUE, sizeof(object_t *));
         g_array_append_val(params, object);
-        item_str = repr_func->func_props->ob_func(params);
+        result = func->func_props->ob_func(params);
         g_array_free(params, FALSE);
     } else {
-        set_exception("__repr__ should be a function returning string");
+        set_exception("field should be a function.");
         interpreter.error = RUN_ERROR;
         return NULL;
     }
+    return result;
+}
+
+object_t *object_call_repr(object_t *object) {
+    object_t *item_str = object_call_func_no_param(object, "__repr__");
     if (interpreter.error == RUN_ERROR)
         return NULL;
     if (item_str->type != STR_TYPE) {
         set_exception("__repr__ should be a function returning string");
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
+    return item_str;
+}
+
+object_t *object_str(GArray *args) {
+   object_t *self = (object_t *)g_array_index(args, object_t *, 0);
+   return object_call_repr(self);
+}
+
+object_t *object_call_str(object_t *object) {
+    object_t *item_str = object_call_func_no_param(object, "__str__");
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
+    if (item_str->type != STR_TYPE) {
+        set_exception("__str__ should be a function returning string");
         interpreter.error = RUN_ERROR;
         return NULL;
     }
@@ -79,13 +105,13 @@ object_t *object_get_field(object_t *object, char* name) {
     field = g_hash_table_lookup(object->class->fields, name);
     if (field != NULL)
         return field;
-    else if (object->class->class_props->inherits == NULL) {
+    printd("CLASS FIELDS\n");
+    g_hash_table_foreach(object->class->fields, print_var_each, NULL);
+    if (object->class->class_props->inherits == NULL) {
         interpreter.error = RUN_ERROR;
         set_exception("Field not found %s\n", name);
         return NULL;
     }
-    printd("CLASS FIELDS\n");
-    g_hash_table_foreach(object->class->fields, print_var_each, NULL);
     field = g_hash_table_lookup(object->class->class_props->inherits->fields, name);
     if (field == NULL) {
         printd("INHERITS FIELDS\n");
@@ -103,7 +129,8 @@ void object_add_field(object_t *object, char* name, object_t *field) {
 }
 
 void init_object() {
-    object_t *object_class = new_class(strdup("object"));
+    object_class = new_class(strdup("object"));
     object_class->class_props->ob_func = new_object_instance;
+    object_add_field(object_class, "__str__", new_func(object_str, strdup("__str__")));
     register_global(strdup("object"), object_class);
 }
