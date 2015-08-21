@@ -116,6 +116,7 @@ char *atom_type_name(int type) {
         case A_YIELD: return "YIELD";
         case A_GENFUNCDEF: return "GENFUNCDEF";
         case A_SLICE: return "SLICE";
+        case A_TUPLE: return "TUPLE";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -896,6 +897,28 @@ char buff[1024];
     return top_comp != NULL? top_comp : shift;
 }
 
+atom_t *parse_tuple(struct t_tokenizer *tokenizer) {
+    atom_t * tuple = new_atom(strdup("tuple"), A_TUPLE);
+    struct t_token *token;
+    while((token = *(tokenizer->iter))) {
+        if (token == NULL || token->type != T_IDENTIFIER) {
+            tokenizer->error = PARSE_ERROR;
+            free_atom_tree(tuple);
+            printf("PARSE_TUPLE IDENTIRIER ERR\n");
+            return NULL;
+        }
+        atom_t *param = new_atom(strdup(token->value), A_VAR);
+        add_child_atom(tuple, param);
+        tokenizer->iter++;
+        token = *tokenizer->iter;
+        if (token->type != T_COMMA)
+            return tuple;
+        tokenizer->iter++;
+    }
+    tokenizer->iter++;
+    return tuple;
+}
+
 atom_t *parse_params(struct t_tokenizer *tokenizer) {
     atom_t * params = new_atom(strdup("params"), A_PARAMS);
     struct t_token * ophar = *tokenizer->iter;
@@ -1245,15 +1268,43 @@ atom_t *parse_if(struct t_tokenizer *tokenizer, int current_indent) {
 
 atom_t *parse_for(struct t_tokenizer *tokenizer, int current_indent) {
     struct t_token *var_name = *tokenizer->iter;
-    if (var_name == NULL || var_name->type != T_IDENTIFIER) {
+    atom_t *var;
+    if (var_name == NULL) {
         tokenizer->error = PARSE_ERROR;
         printf("PARSE_FOR var_name\n");
         return NULL;
     }
-    tokenizer->iter++;
+    struct t_token *next_tok = *(tokenizer->iter+1);
+printf("NO PHAR %s %s %s\n", var_name->value, next_tok->value, token_type_name(next_tok->type));
+    if (var_name->type == T_IDENTIFIER && next_tok && next_tok->type == T_COMMA) {
+    printf("NO PHAR\n");
+        var = parse_tuple(tokenizer);
+        if (tokenizer->error == PARSE_ERROR)
+            return NULL;
+    } else if (var_name->type == T_OPHAR) {
+    printf("PHAR\n");
+        tokenizer->iter++;
+        var = parse_tuple(tokenizer);
+        if (tokenizer->error == PARSE_ERROR)
+            return NULL;
+        if ((*tokenizer->iter)->type != T_CPHAR) {
+            printf("PARSE_FOR tuple end error\n");
+            tokenizer->error = PARSE_ERROR;
+            return NULL;
+        }
+        tokenizer->iter++;
+    }  else if (var_name->type == T_IDENTIFIER) {
+    printf("IDENT\n");
+        var = new_atom(strdup(var_name->value), A_VAR);
+        tokenizer->iter++;
+    } else {
+        printf("PARSE_FOR not tuple or var\n");
+        tokenizer->error = PARSE_ERROR;
+        return NULL;
+    }
     struct t_token *in = *tokenizer->iter;
-    if (in == NULL || var_name->type != T_IDENTIFIER || strcmp(in->value, "in")) {
-        printf("PARSE_FOR in\n");
+    if (in == NULL || strcmp(in->value, "in")) {
+        printf("PARSE_FOR in %s\n", in?in->value:"");
         tokenizer->error = PARSE_ERROR;
         return NULL;
     }
@@ -1283,7 +1334,6 @@ atom_t *parse_for(struct t_tokenizer *tokenizer, int current_indent) {
     }
     tokenizer->iter++;
     atom_t *for_loop = new_atom(strdup("FOR"), A_FOR);
-    atom_t *var = new_atom(strdup(var_name->value), A_VAR);
     add_child_atom(for_loop, var);
     add_child_atom(for_loop, expr);
     atom_t *block = parse_block(tokenizer, current_indent);

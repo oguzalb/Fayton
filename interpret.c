@@ -567,6 +567,11 @@ object_t *interpret_stmt(atom_t *stmt, GHashTable *context, int current_indent) 
         g_array_append_val(args, iterator);
         object_t *item;
         while(item = next_func->func_props->ob_func(args)) {
+            if (var_name->type == A_TUPLE) {
+                set_exception("tuples for for loop not implemented yet\n");
+                interpreter.error = RUN_ERROR;
+                return NULL;
+            }
             register_global(var_name->value, item);
             interpret_block(block, context, current_indent);
             if (interpreter.error == RUN_ERROR) {

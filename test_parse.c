@@ -281,6 +281,24 @@ int main () {
         VAR:print\n\
         PARAMS:params\n\
           VAR:i\n", &tree);
+    test_parse_block("for i, j in range(1,10):\n    print(i, j)",
+"BLOCK:block\n\
+  FOR:FOR\n\
+    TUPLE:tuple\n\
+      VAR:i\n\
+      VAR:j\n\
+    FUNCCALL:()call\n\
+      VAR:range\n\
+      PARAMS:params\n\
+        INTEGER:1\n\
+        INTEGER:10\n\
+    BLOCK:block\n\
+      FUNCCALL:()call\n\
+        VAR:print\n\
+        PARAMS:params\n\
+          VAR:i\n\
+          VAR:j\n", &tree);
+
     test_parse_block("def add(a, b):\n    return a + b",
 "BLOCK:block\n\
   FUNCDEF:add\n\
