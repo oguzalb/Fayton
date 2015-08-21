@@ -26,8 +26,8 @@ void test_parse_func_basic(char* code, char *expect, atom_tree_t *tree, atom_t *
     assert(tokenizer->error != PARSE_ERROR);
     tree->root = func(tokenizer);
 printf("PARSE FINISHED\n");
-    free_tokenizer(tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
+    free_tokenizer(tokenizer);
     char buff[1024];
     buff[0] = '\0';
     print_atom(tree->root, buff, 0, FALSE);
@@ -43,8 +43,8 @@ void test_parse_func(char* code, char *expect, atom_tree_t *tree, atom_t * (func
     int success = tokenize_stream(stream, tree, tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
     tree->root = func(tokenizer, NULL);
-    free_tokenizer(tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
+    free_tokenizer(tokenizer);
     char buff[1024];
     buff[0] = '\0';
     print_atom(tree->root, buff, 0, FALSE);
@@ -60,8 +60,8 @@ void test_parse_expr(char* code, char*expect, atom_tree_t *tree) {
     int success = tokenize_stream(stream, tree, tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
     tree->root = parse_expr(tokenizer);
-    free_tokenizer(tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
+    free_tokenizer(tokenizer);
     char buff[1024];
     buff[0] = '\0';
     print_atom(tree->root, buff, 0, FALSE);

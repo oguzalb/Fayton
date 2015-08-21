@@ -1,6 +1,7 @@
 #include "int.h"
 
 object_t *int_sub(GArray *args) {
+    assert(args->len == 2);
     object_t *left = g_array_index(args, object_t*, 0);
     object_t *right = g_array_index(args, object_t*, 1);
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
@@ -11,6 +12,7 @@ object_t *int_sub(GArray *args) {
 }
 
 object_t *int_add(GArray *args) {
+    assert(args->len == 2);
     object_t *left = g_array_index(args, object_t*, 0);
     object_t *right = g_array_index(args, object_t*, 1);
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
@@ -21,6 +23,7 @@ object_t *int_add(GArray *args) {
 }
 
 object_t *int_cmp(GArray *args) {
+    assert(args->len == 2);
     object_t *left = g_array_index(args, object_t*, 0);
     object_t *right = g_array_index(args, object_t*, 1);
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
@@ -32,6 +35,7 @@ object_t *int_cmp(GArray *args) {
 }
 
 object_t *int_equals(GArray *args) {
+    assert(args->len == 2);
     object_t *left = g_array_index(args, object_t*, 0);
     object_t *right = g_array_index(args, object_t*, 1);
     if (left->type != INT_TYPE || right->type != INT_TYPE) {

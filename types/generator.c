@@ -105,7 +105,7 @@ object_t *new_generator_internal(GArray *args, GHashTable *context, object_t* ru
     return generator;
 }
 
-void init_generator () {
+void init_generator() {
     generator_class = new_class(strdup("generator"));
     object_add_field(generator_class, "next", new_func(generator_next, strdup("next")));
     object_add_field(generator_class, "__iter__", new_func(generator_iter, strdup("__iter__")));

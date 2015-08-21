@@ -9,6 +9,7 @@ object_t *new_bool_from_int(int value) {
         printd("\'NEW\' BOOL %s\n", bool_obj->bool_props->ob_bval?"True":"False");
     }
     printd("\'RETURNING\' BOOL %s\n", bool_obj->bool_props->ob_bval?"True":"False");
+printf("bool_type %d\n", bool_obj->type);
     return bool_obj;
 }
 

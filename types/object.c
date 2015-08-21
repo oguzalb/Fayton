@@ -144,8 +144,7 @@ object_t *object_equals(GArray *args) {
     object_t *int_result = object_call_func_obj(cmp_func, params);
     if (interpreter.error == RUN_ERROR)
         return NULL;
-    object_t *cmp_result_equals_zero = new_int_internal(int_result->int_props->ob_ival == 0);
-    return new_bool_internal(cmp_result_equals_zero);
+    return new_bool_from_int(int_result->int_props->ob_ival == 0);
 }
 
 object_t *object_get_field_no_check(object_t *object, char* name) {
@@ -177,13 +176,14 @@ object_t *object_get_field_no_check(object_t *object, char* name) {
     return field;
 }
 
-object_t *object_get_field(object_t *object, char* name) {
+object_t *object_get_field(object_t *object, char *name) {
     object_t *field = object_get_field_no_check(object, name);
     if (field == NULL) {
         interpreter.error = RUN_ERROR;
         set_exception("Field not found %s\n", name);
         return NULL;
     }
+    return field;
 }
 
 void object_add_field(object_t *object, char* name, object_t *field) {

@@ -324,6 +324,7 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
             g_array_append_val(args, value);
             param = param->next;
         }
+    printd("calling func type %s %s\n", object_type_name(func->type), func->func_props->name);
     } else if (func->type == USERFUNC_TYPE || func->type == GENERATORFUNC_TYPE) {
         atom_t *param = func_call->child->next->child;
         atom_t *param_name = func->userfunc_props->ob_userfunc->child->child;
@@ -350,9 +351,9 @@ object_t *interpret_funccall(atom_t *func_call, GHashTable *context, int current
             param_name = param_name->next;
             // TODO check if they match
         }
+    printd("calling func type %s\n", object_type_name(func->type));
     }
     printd("ADDED PARAMS\n");
-    printd("calling func type %s\n", object_type_name(func->type));
     struct py_thread *thread = get_thread();
     char* func_name;
     object_t *result;

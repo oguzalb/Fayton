@@ -125,6 +125,7 @@ struct _interpreter {
 
 void print_var_each(gpointer, gpointer, gpointer);
 object_t *interpret_block(atom_t *, GHashTable *, int);
+object_t *interpret_funcblock(atom_t *, GHashTable *, int);
 void init_interpreter();
 object_t *new_func(object_t *(*)(GArray *), char *);
 void register_global(char*, object_t *);
@@ -147,5 +148,7 @@ struct py_thread *new_thread_struct();
 #include "types/list.h"
 #include "types/dict.h"
 #include "types/thread.h"
+#include "types/slice.h"
+#include "types/generator.h"
 
 #endif
