@@ -3,7 +3,9 @@
 #include "../interpret.h"
 
 void object_add_field(object_t *object, char* name, object_t *field);
+object_t *object_call_func_obj_no_param(object_t * object, object_t *func);
 object_t *object_get_field(object_t *object, char* name);
+object_t *object_get_field_no_check(object_t *object, char* name);
 object_t *object_call_repr(object_t *object);
 object_t *object_call_str(object_t *object);
 object_t *object_equals(GArray *args);

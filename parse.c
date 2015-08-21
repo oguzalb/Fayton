@@ -484,6 +484,11 @@ printd("PARSE_DICTIONARY START\n");
     }
     tokenizer->iter++;
     atom_t *dictionary = new_atom(strdup("dict"), A_DICTIONARY);
+    token = *tokenizer->iter;
+    if (token->type == T_CCURLY) {
+        tokenizer->iter++;
+        return dictionary;
+    }
     atom_t *key = parse_comp(tokenizer);
     if (tokenizer->error == PARSE_ERROR)
         return NULL;
@@ -995,7 +1000,40 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
         if (tokenizer->error == PARSE_ERROR)
             return NULL;
         struct t_token *token = *tokenizer->iter;
-        if (token->type == T_EQUALS) {
+        if (token->type == T_OBRACKET) {
+            tokenizer->iter++;
+            atom_t *slice = parse_slice(tokenizer);
+            if (tokenizer->error == PARSE_ERROR)
+               return NULL;
+            tokenizer->iter++;
+            token = *tokenizer->iter;
+            if (token->type != T_EQUALS) {
+                printf("PARSE_STMT NOT EQUALS OR OPHAR setitem |%s|\n", token->value);
+                tokenizer->error = PARSE_ERROR;
+                if(var)
+                    free_atom_tree(var);
+                free_atom_tree(slice);
+                return NULL;
+            }
+            tokenizer->iter++;
+            atom_t *expr = parse_comp(tokenizer);
+            if (expr == NULL) {
+                if(var)
+                    free_atom_tree(var);
+                free_atom_tree(slice);
+                return NULL;
+            }
+            stmt = new_atom(strdup("call()"), A_FUNCCALL);
+            atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
+            add_child_atom(accessor, var);
+            atom_t *setitem = new_atom(strdup("__setitem__"), A_VAR);
+            add_child_atom(accessor, setitem);
+            add_child_atom(stmt, accessor);
+            atom_t *params = new_atom(strdup("params"), A_PARAMS);
+            add_child_atom(params, slice);
+            add_child_atom(params, expr);
+            add_child_atom(stmt, params);
+        } else if (token->type == T_EQUALS) {
             tokenizer->iter++;
             stmt = new_atom(strdup("="), A_ASSIGNMENT);
             add_child_atom(stmt, var);

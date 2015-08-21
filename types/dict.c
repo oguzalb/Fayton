@@ -66,6 +66,29 @@ object_t *dict_get(GArray *args) {
     return obj != NULL ? obj : new_none_internal();
 }
 
+object_t *dict_getitem(GArray *args) {
+    object_t *value = dict_get(args);
+    if (value == NULL || value->type == NONE_TYPE) {
+        set_exception("KeyError");
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
+    return value;
+}
+
+object_t *dict_setitem(GArray *args) {
+    if (args->len != 3) {
+        interpreter.error = RUN_ERROR;
+        set_exception("expected 3 arguments\n");
+        return NULL;
+    }
+    object_t *self = g_array_index(args, object_t *, 0);
+    object_t *key = g_array_index(args, object_t *, 1);
+    object_t *val = g_array_index(args, object_t *, 2);
+    g_hash_table_insert(self->dict_props->ob_dval, key, val);
+    return new_none_internal();
+}
+
 object_t *new_dict(GArray *args) {
     // TODO args check
     object_t * dict = new_object(DICTIONARY_TYPE);
@@ -82,6 +105,8 @@ void init_dict() {
     object_add_field(dict_class, "keys", new_func(dict_keys, strdup("keys")));
     object_add_field(dict_class, "values", new_func(dict_keys, strdup("values")));
     object_add_field(dict_class, "get", new_func(dict_get, strdup("keys")));
+    object_add_field(dict_class, "__getitem__", new_func(dict_getitem, strdup("__getitem__")));
+    object_add_field(dict_class, "__setitem__", new_func(dict_setitem, strdup("__setitem__")));
     object_add_field(dict_class, "__repr__", new_func(dict_repr, strdup("__repr__")));
     register_global(strdup("dict"), dict_class);
 }

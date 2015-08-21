@@ -463,6 +463,15 @@ else:\n\
             VAR:a\n\
       RETURN:return\n\
         INTEGER:1\n", &tree);
+    test_parse_block("d[\"num\"] = 5",
+"BLOCK:block\n\
+  FUNCCALL:call()\n\
+    ACCESSOR:.\n\
+      VAR:d\n\
+      VAR:__setitem__\n\
+    PARAMS:params\n\
+      STRING:num\n\
+      INTEGER:5\n", &tree);
     //fclose(stream);
     return 0;
     //fclose(fp);
