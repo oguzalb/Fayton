@@ -50,6 +50,7 @@
 #define A_IF 32
 #define A_YIELD 33
 #define A_GENFUNCDEF 34
+#define A_SLICE 35
 
 typedef struct _atom_t {
     char *value;

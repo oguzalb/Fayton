@@ -115,6 +115,7 @@ char *atom_type_name(int type) {
         case A_IF: return "IF";
         case A_YIELD: return "YIELD";
         case A_GENFUNCDEF: return "GENFUNCDEF";
+        case A_SLICE: return "SLICE";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -401,16 +402,23 @@ atom_t *parse_slice(struct t_tokenizer *tokenizer) {
         return NULL;
     }
 // TODO expr
-    atom_t *first_arg = parse_comp(tokenizer);
-    if (first_arg == NULL)
-        return NULL;
+    atom_t *first_arg;
+    if (token->type == T_COLUMN) {
+        first_arg = new_atom(strdup("None"), A_VAR);
+    } else {
+        first_arg = parse_comp(tokenizer);
+        if (first_arg == NULL)
+            return NULL;
+    }
     atom_t *prev_arg = first_arg;
     while (TRUE) {
         token = *tokenizer->iter;
 printd("%s++\n", token->value);
         if (token->type == T_CBRACKET) {
+            atom_t *slicecont = new_atom(strdup("slicecont"), A_SLICE);
             if (first_arg->next == NULL) {
-                return first_arg;
+                add_child_atom(slicecont, first_arg);
+                return slicecont;
             }
             atom_t *funccall = new_atom(strdup("slicecall"), A_FUNCCALL);
             atom_t *slice = new_atom(strdup("slice"), A_VAR);
@@ -418,18 +426,24 @@ printd("%s++\n", token->value);
             atom_t *params = new_atom(strdup("params"), A_PARAMS);
             add_child_atom(funccall, params);
             add_child_atom(params, first_arg);
-            return funccall;
+            add_child_atom(slicecont, funccall);
+            return slicecont;
         }
         if (token->type != T_COLUMN) {
-printf("PARSE_GETITEM COLUMN ERR %s %s\n", token->value, token_type_name(token->type));
+            printf("PARSE_GETITEM COLUMN ERR %s %s\n", token->value, token_type_name(token->type));
             tokenizer->error = PARSE_ERROR;
             free_atom_tree(first_arg);
             return NULL;
         }
-        tokenizer->iter++;
-        atom_t *arg = parse_comp(tokenizer);
-        if (tokenizer->error == PARSE_ERROR)
-            return NULL;
+        token = *(++tokenizer->iter);
+        atom_t *arg;
+        if (token->type == T_COLUMN || token->type == T_CBRACKET) {
+            arg = new_atom(strdup("None"), A_VAR);
+        } else {
+            arg = parse_comp(tokenizer);
+            if (tokenizer->error == PARSE_ERROR)
+                return NULL;
+        }
         prev_arg->next = arg;
         prev_arg = arg;
     }
@@ -580,6 +594,18 @@ printd("PARSE_ATOM START\n");
         atom_t *var = new_atom(strdup(first_arg->value), A_INTEGER);
         tokenizer->iter++;
         return var;
+    } else if (first_arg->type == T_MINUS) {
+        struct t_token *token = *(++tokenizer->iter);
+        if (token == NULL || token->type != T_NUMBER) {
+            tokenizer->error = PARSE_ERROR;
+            printf("PARSE_ATOM_ERROR, expecting number %s\n", token?token->value:"");
+            return NULL;
+        }
+        char *neg_value;
+        asprintf(&neg_value, "-%s", token->value);
+        atom_t *var = new_atom(neg_value, A_INTEGER);
+        tokenizer->iter++;
+        return var;
     } else if (first_arg->type == T_STRING) {
 // TODO strtoint
         atom_t *var = new_atom(strdup(first_arg->value), A_STRING);
@@ -655,7 +681,9 @@ atom_t *parse_trailer(struct t_tokenizer *tokenizer) {
     }
 }
 
+atom_t *extract_slice(atom_t *slice);
 atom_t *parse_power(struct t_tokenizer *tokenizer) {
+char buff[2048];
     atom_t *atom = parse_atom(tokenizer);
     if (tokenizer->error == PARSE_ERROR)
         return NULL;
@@ -667,11 +695,12 @@ atom_t *parse_power(struct t_tokenizer *tokenizer) {
     }
     if (top_trailer == NULL)
         return atom;
-    if (top_trailer->type == A_ACCESSOR || (top_trailer->type == A_FUNCCALL && strcmp(top_trailer->value, "slicecall"))) {
+    if (top_trailer->type == A_ACCESSOR || (top_trailer->type == A_FUNCCALL)) {
         add_child_atom(top_trailer, atom);
         switch_children_atom(top_trailer);
     } else {
 // SLICE
+        top_trailer = extract_slice(top_trailer);
         atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
         add_child_atom(accessor, atom);
         atom_t *getitem = new_atom(strdup("__getitem__"), A_VAR);
@@ -694,12 +723,13 @@ atom_t *parse_power(struct t_tokenizer *tokenizer) {
             switch_children_atom(trailer);
             top_trailer = trailer;
 // hacky but... :)
-        } else if (trailer->type == A_FUNCCALL && strcmp(trailer->value, "slicecall")) {
+        } else if (trailer->type == A_FUNCCALL) {
             add_child_atom(trailer, top_trailer);
             switch_children_atom(trailer);
             top_trailer = trailer;
         } else {
 // SLICE
+            trailer = extract_slice(trailer);
             atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
             add_child_atom(accessor, top_trailer);
             atom_t *getitem = new_atom(strdup("__getitem__"), A_VAR);
@@ -956,6 +986,16 @@ atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
     return funcdef;
 }
 
+atom_t *extract_slice(atom_t *slice) {
+    if (slice->type != A_SLICE)
+        return slice;
+    atom_t *new_slice = slice->child;
+    slice->next = NULL;
+    slice->child = NULL;
+    free_atom_tree(slice);
+    return new_slice;
+}
+
 atom_t *parse_class(struct t_tokenizer *, int);
 atom_t *parse_if(struct t_tokenizer *, int);
 atom_t *parse_for(struct t_tokenizer *, int);
@@ -1005,6 +1045,7 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
             atom_t *slice = parse_slice(tokenizer);
             if (tokenizer->error == PARSE_ERROR)
                return NULL;
+            slice = extract_slice(slice);
             tokenizer->iter++;
             token = *tokenizer->iter;
             if (token->type != T_EQUALS) {

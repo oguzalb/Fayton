@@ -398,7 +398,7 @@ else:\n\
         VAR:print\n\
         PARAMS:params\n\
           STRING:a * 3 equals to 9\n", &tree);
-    test_parse_func_basic("l[1:3:1]",
+    test_parse_func_basic("l[1:3:2]",
 "FUNCCALL:()call\n\
   ACCESSOR:.\n\
     VAR:l\n\
@@ -409,7 +409,20 @@ else:\n\
       PARAMS:params\n\
         INTEGER:1\n\
         INTEGER:3\n\
-        INTEGER:1\n", &tree, parse_expr); 
+        INTEGER:2\n", &tree, parse_expr); 
+    test_parse_func_basic("l[::]",
+"FUNCCALL:()call\n\
+  ACCESSOR:.\n\
+    VAR:l\n\
+    VAR:__getitem__\n\
+  PARAMS:params\n\
+    FUNCCALL:slicecall\n\
+      VAR:slice\n\
+      PARAMS:params\n\
+        VAR:None\n\
+        VAR:None\n\
+        VAR:None\n", &tree, parse_expr); 
+
     test_parse_block("d = a.b.c[1:2:3][1]", 
 "BLOCK:block\n\
   ASSIGNMENT:=\n\
@@ -472,6 +485,27 @@ else:\n\
     PARAMS:params\n\
       STRING:num\n\
       INTEGER:5\n", &tree);
+    test_parse_block("print([1,2,3][a.__cmp__(9)])\n",
+"BLOCK:block\n\
+  FUNCCALL:()call\n\
+    VAR:print\n\
+    PARAMS:params\n\
+      FUNCCALL:()call\n\
+        ACCESSOR:.\n\
+          LIST:list\n\
+            INTEGER:1\n\
+            INTEGER:2\n\
+            INTEGER:3\n\
+          VAR:__getitem__\n\
+        PARAMS:params\n\
+          FUNCCALL:()call\n\
+            ACCESSOR:.\n\
+              VAR:a\n\
+              VAR:__cmp__\n\
+            PARAMS:params\n\
+              INTEGER:9\n",&tree);
+
+
     //fclose(stream);
     return 0;
     //fclose(fp);

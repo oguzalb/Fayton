@@ -10,7 +10,7 @@ object_t *new_listiterator(GArray *args) {
     return new_listiterator_internal(list);
 }
 
-object_t *listiterator_next_func(GArray *args) {
+object_t *listiterator_next(GArray *args) {
     // TODO args check
     object_t *iterator = g_array_index(args, object_t*, 0);
     object_t **objectp = iterator->listiterator_props->objectp;
@@ -19,7 +19,7 @@ object_t *listiterator_next_func(GArray *args) {
     return *objectp;
 }
 
-object_t *list_iter_func(GArray *args) {
+object_t *list_iter(GArray *args) {
     printd("__iter__ creating list iterator from list\n");
     object_t *list = g_array_index(args, object_t*, 0);
     return new_listiterator_internal(list);
@@ -128,12 +128,55 @@ object_t *new_listiterator_internal(object_t *list) {
     return listiterator;
 }
 
-object_t *list_getitem_func(GArray *args) {
+object_t *list_setitem(GArray *args) {
+    // TODO
+    assert(args->len == 3);
+    object_t *self = g_array_index(args, object_t *, 0);
+    object_t *index = g_array_index(args, object_t *, 1);
+    object_t *item = g_array_index(args, object_t *, 2);
+    if (index->type != INT_TYPE) {
+        set_exception("Type should be int\n");
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
+    if (index->int_props->ob_ival >= self->list_props->ob_aval->len) {
+        set_exception("index bigger than list size\n");
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
+    int len = self->list_props->ob_aval->len;
+    int i = index->int_props->ob_ival;
+    if (i < 0) {
+        i = len + i;
+        if (i < 0) {
+            set_exception("index out of range\n");
+            interpreter.error = RUN_ERROR;
+            return NULL;
+        }
+    }
+    object_t **place = ((object_t **) (void *)self->list_props->ob_aval->data) + i;
+    *place = item;
+    return new_none_internal();
+}
+
+object_t *list_getitem(GArray *args) {
+    // TODO
     assert(args->len == 2);
     object_t *list = g_array_index(args, object_t *, 0);
     object_t *slice = g_array_index(args, object_t *, 1);
-    if (slice->type == INT_TYPE)
-        return g_array_index(list->list_props->ob_aval, object_t *, slice->int_props->ob_ival);
+    if (slice->type == INT_TYPE) {
+        int i = slice->int_props->ob_ival;
+        int len = list->list_props->ob_aval->len;
+        if (i < 0) {
+            i = len + i;
+            if (i < 0) {
+                set_exception("index out of range\n");
+                interpreter.error = RUN_ERROR;
+                return NULL;
+            }
+        }
+        return g_array_index(list->list_props->ob_aval, object_t *, i);
+    }
     if (slice->type != SLICE_TYPE) {
         set_exception("Type should be int or slice\n");
         interpreter.error = RUN_ERROR;
@@ -146,7 +189,6 @@ object_t *list_getitem_func(GArray *args) {
     object_t **glist_stop;
     object_t **glist_start;
     int step;
-    int stop;
     if (slice->slice_props->step == none)
         step = 1;
     else
@@ -158,7 +200,7 @@ object_t *list_getitem_func(GArray *args) {
             glist_start = glist_begin;
     else {
         if (slice->slice_props->start->int_props->ob_ival < 0)
-           glist_start = glist_end - slice->slice_props->start->int_props->ob_ival + 1;
+           glist_start = glist_end + slice->slice_props->start->int_props->ob_ival + 1;
         else
            glist_start = glist_begin + slice->slice_props->start->int_props->ob_ival;
     }
@@ -169,9 +211,9 @@ object_t *list_getitem_func(GArray *args) {
             glist_stop = glist_end + 1;
     else {
         if (slice->slice_props->stop->int_props->ob_ival < 0)
-            glist_stop = glist_end - slice->slice_props->stop->int_props->ob_ival + 1;
+            glist_stop = glist_end + slice->slice_props->stop->int_props->ob_ival + 2;
         else
-            glist_stop = glist_begin + slice->slice_props->stop->int_props->ob_ival;
+            glist_stop = glist_begin + slice->slice_props->stop->int_props->ob_ival + 1;
     }
     if (step == 0) {
         set_exception("Step can not be 0\n");
@@ -179,7 +221,8 @@ object_t *list_getitem_func(GArray *args) {
         return NULL;
     }
     object_t *sl_list = new_list_internal();
-    for (;glist_start < glist_stop && glist_start > glist_begin; glist_start += step) {
+    int stop_cond = glist_start > glist_stop;
+    for (;stop_cond == (glist_start > glist_stop) && glist_start >= glist_begin; glist_start += step) {
         g_array_append_val(sl_list->list_props->ob_aval, *glist_start);
     }
     return sl_list;
@@ -224,13 +267,14 @@ object_t *new_list(GArray *args) {
 void init_list() {
     object_t *listiterator_class = new_class(strdup("listiterator"));
     listiterator_class->class_props->ob_func = new_listiterator;
-    object_add_field(listiterator_class, "next", new_func(listiterator_next_func, strdup("next")));
+    object_add_field(listiterator_class, "next", new_func(listiterator_next, strdup("next")));
     register_global(strdup("listiterator"), listiterator_class);
     
     object_t *list_class = new_class(strdup("list"));
     list_class->class_props->ob_func = new_list;
-    object_add_field(list_class, "__iter__", new_func(list_iter_func, strdup("__iter__")));
-    object_add_field(list_class, "__getitem__", new_func(list_getitem_func, strdup("__getitem__")));
+    object_add_field(list_class, "__iter__", new_func(list_iter, strdup("__iter__")));
+    object_add_field(list_class, "__getitem__", new_func(list_getitem, strdup("__getitem__")));
+    object_add_field(list_class, "__setitem__", new_func(list_setitem, strdup("__setitem__")));
     object_add_field(list_class, "append", new_func(list_append, strdup("append")));
     object_add_field(list_class, "extend", new_func(list_extend, strdup("extend")));
     object_add_field(list_class, "insert", new_func(list_insert, strdup("insert")));
