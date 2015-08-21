@@ -1,21 +1,24 @@
 #include "bool.h"
 
+object_t *new_bool_from_int(int value) {
+    object_t *bool_obj = get_global_no_check(value != 0 ? "True":"False");
+    if (bool_obj == NULL) {
+        bool_obj = new_object(BOOL_TYPE);
+        bool_obj->bool_props = malloc(sizeof(struct bool_type));
+        bool_obj->bool_props->ob_bval = value? TRUE: FALSE;
+        printd("\'NEW\' BOOL %s\n", bool_obj->bool_props->ob_bval?"True":"False");
+    }
+    printd("\'RETURNING\' BOOL %s\n", bool_obj->bool_props->ob_bval?"True":"False");
+    return bool_obj;
+}
+
 object_t *new_bool_internal(object_t *object) {
     if (object->type != INT_TYPE) { 
         printd("NOT INT\n");
         interpreter.error = RUN_ERROR;
         return NULL;
     }
-    object_t *bool_obj;
-    bool_obj = get_global_no_check(object->int_props->ob_ival?"True":"False");
-    if (bool_obj == NULL) {
-        bool_obj = new_object(BOOL_TYPE);
-        bool_obj->bool_props = malloc(sizeof(struct bool_type));
-        bool_obj->bool_props->ob_bval = object->int_props->ob_ival? TRUE: FALSE;
-        printd("\'NEW\' BOOL %s\n", bool_obj->bool_props->ob_bval?"True":"False");
-    }
-    printd("\'RETURNING\' BOOL %s\n", bool_obj->bool_props->ob_bval?"True":"False");
-    return bool_obj;
+   return new_bool_from_int(object->int_props->ob_ival);
 }
 
 object_t* new_bool(GArray *args) {

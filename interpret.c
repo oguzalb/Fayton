@@ -79,6 +79,7 @@ object_t *new_class(char* name) {
     cls->class_props = malloc(sizeof(struct class_type));
     cls->class_props->inherits = object_class;
     cls->class_props->name = name;
+    cls->class = NULL;
     return cls;
 }
 
@@ -144,26 +145,6 @@ object_t *new_generator_func(atom_t *func, char* name) {
     func_obj->generatorfunc_props->name = name;
     func_obj->class = NULL;
     return func_obj;
-}
-
-gboolean object_equal(gconstpointer a, gconstpointer b) {
-    // TODO should call equals function for different types
-    object_t *aobj = (object_t *)a;
-    object_t *bobj = (object_t *)b;
-    object_t *eq_func = object_get_field(aobj, "__eq__");
-    if (eq_func == NULL)
-        return g_direct_equal(a, b);
-    GArray *sub_args = g_array_new(TRUE, TRUE, sizeof(object_t *));
-    g_array_append_val(sub_args, aobj);
-    g_array_append_val(sub_args, bobj);
-    object_t *equals = object_equals(sub_args);
-    return equals->bool_props->ob_bval == TRUE;
-}
-
-guint object_hash(gconstpointer key) {
-    // TODO should call hash function for different types
-    object_t *object = (object_t *)key;
-    return g_int_hash(&object->int_props->ob_ival);
 }
 
 object_t *interpret_funcblock(atom_t *, GHashTable *, int);
@@ -426,6 +407,8 @@ object_t *interpret_dict(atom_t *expr, GHashTable *context, int current_indent) 
             return dict;
         }
         g_hash_table_insert(dict->dict_props->ob_dval, key, value);
+        if (interpreter.error == RUN_ERROR)
+            return NULL;
         elem = elem->next->next;
     }
     return dict;

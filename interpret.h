@@ -126,8 +126,6 @@ struct _interpreter {
 void print_var_each(gpointer, gpointer, gpointer);
 object_t *interpret_block(atom_t *, GHashTable *, int);
 void init_interpreter();
-gboolean object_equal(gconstpointer, gconstpointer);
-guint object_hash(gconstpointer);
 object_t *new_func(object_t *(*)(GArray *), char *);
 void register_global(char*, object_t *);
 object_t *get_global(char*);

@@ -87,6 +87,7 @@ int main() {
             struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
             print_stack_trace(main_thread);
             g_array_free(main_thread->stack_trace, FALSE);
+            main_thread->stack_trace = g_array_new(TRUE, TRUE, sizeof(char *));
 // TODO free also others
         }
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);

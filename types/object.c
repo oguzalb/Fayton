@@ -2,6 +2,26 @@
 
 object_t *object_class = NULL;
 
+gboolean object_equal(gconstpointer a, gconstpointer b) {
+    // TODO should call equals function for different types
+    object_t *aobj = (object_t *)a;
+    object_t *bobj = (object_t *)b;
+    object_t *eq_func = object_get_field(aobj, "__eq__");
+    if (eq_func == NULL)
+        return g_direct_equal(a, b);
+    GArray *sub_args = g_array_new(TRUE, TRUE, sizeof(object_t *));
+    g_array_append_val(sub_args, aobj);
+    g_array_append_val(sub_args, bobj);
+    object_t *equals = object_equals(sub_args);
+    return equals->bool_props->ob_bval == TRUE;
+}
+
+guint object_hash(gconstpointer key) {
+    // TODO should call hash function for different types
+    object_t *object = (object_t *)key;
+    return g_direct_hash(object);
+}
+
 object_t *new_object(int type) {
     object_t *object = (object_t *) malloc(sizeof(object_t));
     object->fields = g_hash_table_new(g_str_hash, g_str_equal);
@@ -52,9 +72,16 @@ object_t *object_call_repr(object_t *object) {
     return item_str;
 }
 
+object_t *object_repr(GArray *args) {
+    char* str;
+    object_t *self = (object_t *)g_array_index(args, object_t *, 0);
+    asprintf(&str, "< %s instance %p >", self->class_props->name, self);
+    return new_str_internal(str);
+}
+
 object_t *object_str(GArray *args) {
-   object_t *self = (object_t *)g_array_index(args, object_t *, 0);
-   return object_call_repr(self);
+    object_t *self = (object_t *)g_array_index(args, object_t *, 0);
+    return object_call_repr(self);
 }
 
 object_t *object_call_str(object_t *object) {
@@ -132,5 +159,6 @@ void init_object() {
     object_class = new_class(strdup("object"));
     object_class->class_props->ob_func = new_object_instance;
     object_add_field(object_class, "__str__", new_func(object_str, strdup("__str__")));
+    object_add_field(object_class, "__repr__", new_func(object_repr, strdup("__repr__")));
     register_global(strdup("object"), object_class);
 }

@@ -9,6 +9,8 @@ object_t *object_call_str(object_t *object);
 object_t *object_equals(GArray *args);
 object_t *new_object_instance(GArray *args);
 object_t *new_object(int type);
+gboolean object_equal(gconstpointer a, gconstpointer b);
+guint object_hash(gconstpointer key);
 void init_object();
 
 object_t *object_class;
