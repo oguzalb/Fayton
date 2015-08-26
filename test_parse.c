@@ -19,6 +19,7 @@ FILE *fmemopen (void *buf, size_t size, const char *opentype)
 }
 
 void test_parse_func_basic(char* code, char *expect, atom_tree_t *tree, atom_t * (func)(struct t_tokenizer *)) {
+    printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
     struct t_tokenizer *tokenizer = new_tokenizer();
@@ -37,6 +38,7 @@ printf("PARSE FINISHED\n");
 
 }
 void test_parse_func(char* code, char *expect, atom_tree_t *tree, atom_t * (func)(struct t_tokenizer *, atom_t *)) {
+    printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
     struct t_tokenizer *tokenizer = new_tokenizer();
@@ -54,6 +56,7 @@ void test_parse_func(char* code, char *expect, atom_tree_t *tree, atom_t * (func
 
 }
 void test_parse_expr(char* code, char*expect, atom_tree_t *tree) {
+    printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
     struct t_tokenizer *tokenizer = new_tokenizer();
@@ -70,6 +73,7 @@ void test_parse_expr(char* code, char*expect, atom_tree_t *tree) {
     assert(!strcmp(buff, expect));
 }
 void test_parse_block(char* code, char* expect, atom_tree_t *tree) {
+    printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
     struct t_tokenizer *tokenizer = new_tokenizer();

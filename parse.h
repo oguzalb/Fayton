@@ -56,6 +56,11 @@
 typedef struct _atom_t {
     char *value;
     long type;
+// this will be refactored
+    int cl_index;
+// this will be refactored
+// for functions
+    GHashTable *context;
     struct _atom_t *child;
     struct _atom_t *next;
 } atom_t;
@@ -63,6 +68,13 @@ typedef struct _atom_t {
 typedef struct {
     atom_t *root;
 } atom_tree_t;
+
+typedef struct _freevar_t {
+// this will be refactored
+    int type;
+    atom_t *function;
+    int cl_index;
+} freevar_t;
 
 struct t_token {
     char* value;
@@ -75,6 +87,8 @@ struct t_tokenizer {
     struct t_token** tokens;
     int current_line;
     int error;
+    int cl_index;
+    GArray *func_contexts;
 };
 
 int tokenize_stream(FILE *fp, atom_tree_t* root, struct t_tokenizer *tokenizer);

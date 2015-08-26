@@ -15,6 +15,7 @@ FILE *fmemopen (void *buf, size_t size, const char *opentype)
 }
 
 void test_interpret_block(char *code, atom_tree_t *tree) {
+    printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
     struct t_tokenizer *tokenizer = new_tokenizer();
@@ -42,6 +43,7 @@ void test_interpret_block(char *code, atom_tree_t *tree) {
 }
 
 void test_interpret_block_fail(char *code, atom_tree_t *tree) {
+    printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
     struct t_tokenizer *tokenizer = new_tokenizer();
