@@ -9,7 +9,6 @@
 
 struct gen_thread_data_t {
     GArray *args;
-    GHashTable *context;
     object_t *generator;
 };
 
@@ -41,11 +40,11 @@ pthread_setspecific(py_thread_key, p);
     printd("waiting %p from thread_runner (gen thread)\n", gen_thread->generator->generatorfunc_props->cond);
     g_cond_wait(cond, mutex);
     g_mutex_unlock(mutex);
-    interpret_funcblock(thread_data->generator->generatorfunc_props->ob_generatorfunc->child->next, thread_data->context, /* TODO */ 0);
+    interpret_funcblock(thread_data->generator->generatorfunc_props->ob_generatorfunc->child->next, thread_data->args, /* TODO */ 0);
 // StopIterationException when exceptions get fully implemented
 }
 
-void generator_start(object_t *generator, GArray *args, GHashTable* context, object_t *run_func) {
+void generator_start(object_t *generator, GArray *args, object_t *run_func) {
     struct gen_thread_data_t *thread_data = malloc(sizeof(struct gen_thread_data_t));
     GMutex *mutex = malloc(sizeof(GMutex));
     g_mutex_init(mutex);
@@ -56,7 +55,6 @@ void generator_start(object_t *generator, GArray *args, GHashTable* context, obj
     generator->generatorfunc_props->cond = cond;
     generator->generatorfunc_props->mutex = mutex;
     thread_data->args = args;
-    thread_data->context = context;
     thread_data->generator = generator;
     generator->generatorfunc_props->ob_thread = g_thread_new("Python thread", generator_runner, thread_data);
     printd("waiting from generator creation (caller thread)\n");
@@ -95,13 +93,13 @@ object_t *generator_iter(GArray *args) {
 }
 
 static object_t *generator_class;
-object_t *new_generator_internal(GArray *args, GHashTable *context, object_t* run_func) {
+object_t *new_generator_internal(GArray *args, object_t* run_func) {
     object_t *generator = new_object(GENERATORFUNC_TYPE);
     generator->generatorfunc_props = malloc(sizeof(struct generatorfunc_type));
     generator->generatorfunc_props->ob_thread = NULL;
     generator->generatorfunc_props->ob_generatorfunc = run_func;
     generator->class = generator_class;
-    generator_start(generator, args, context, run_func);
+    generator_start(generator, args, run_func);
     return generator;
 }
 

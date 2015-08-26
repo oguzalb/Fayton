@@ -87,7 +87,6 @@ struct t_tokenizer {
     struct t_token** tokens;
     int current_line;
     int error;
-    int cl_index;
     GArray *func_contexts;
 };
 

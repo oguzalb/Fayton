@@ -136,6 +136,13 @@ while a == 5:\n\
     yield 2\n\
 for i in func():\n\
     print(i)\n", &tree);
+    test_interpret_block(
+"def func(a,b):\n\
+    def func2(c,d):\n\
+        return c+d\n\
+    func2(a,b)\n\
+print(func(1,2))\n", &tree);
+
     return 0;
 }
 

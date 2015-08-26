@@ -35,16 +35,20 @@
 struct t_tokenizer *new_tokenizer(){
     struct t_tokenizer *tokenizer = malloc(sizeof(struct t_tokenizer));
     tokenizer->error = 0;
-    tokenizer->cl_index = 0;
     tokenizer->func_contexts = g_array_new(TRUE, TRUE, sizeof(GHashTable*));
     tokenizer->tokens = NULL;
     return tokenizer;
 }
 
+void print_freevar_each(gpointer name, gpointer obj, gpointer user_data) {
+    freevar_t *freevar = (freevar_t *)obj;
+    printf("name %s cl_index %d\n", (char*) name, freevar->cl_index);
+}
+
 freevar_t *new_freevar(struct t_tokenizer *tokenizer, int type, int cl_index) {
     freevar_t *var = malloc(sizeof(freevar_t));
     var->type = type;
-    var->cl_index = tokenizer->cl_index;
+    var->cl_index = cl_index;
     return var;
 }
 
@@ -59,10 +63,10 @@ freevar_t *add_freevar(struct t_tokenizer *tokenizer, atom_t *value) {
         printf("freevar found %s\n", value->value);
         assert(FALSE);
     }
-    freevar = new_freevar(tokenizer, value->type, tokenizer->cl_index);
+    int count = g_hash_table_size(context);
+    freevar = new_freevar(tokenizer, value->type, count);
     value->cl_index = freevar->cl_index;
     g_hash_table_insert(context, value->value, freevar);
-    tokenizer->cl_index++;
     printf("name: %s cl_index: %d context_index: %d\n", value->value, value->cl_index, tokenizer->func_contexts->len-1);
     return freevar;
 }
@@ -79,8 +83,17 @@ freevar_t *get_freevar(struct t_tokenizer *tokenizer, atom_t *value) {
         GHashTable *context = g_array_index(tokenizer->func_contexts, GHashTable*, i);
         freevar = g_hash_table_lookup(context, value->value);
     }
-    if (freevar != NULL)
-        value->cl_index = freevar->cl_index;
+    if (freevar != NULL) {
+        int prev_index = freevar->cl_index;
+        for (i++; i < tokenizer->func_contexts->len && freevar == NULL; i++) {
+            GHashTable *context = g_array_index(tokenizer->func_contexts, GHashTable*, i);
+            freevar_t *inner_freevar = new_freevar(context, value->type, prev_index);
+            g_hash_table_insert(context, value->value, inner_freevar);
+            prev_index = g_hash_table_size(context) - 1;
+        }
+        value->cl_index = prev_index;
+    }
+    
     printf("name: %s cl_index: %d context_index: %d\n", value->value, value->cl_index, tokenizer->func_contexts->len-1);
     return freevar;
 }
@@ -990,6 +1003,41 @@ atom_t *parse_tuple(struct t_tokenizer *tokenizer) {
     return tuple;
 }
 
+atom_t *parse_inherits(struct t_tokenizer *tokenizer) {
+    atom_t * params = new_atom(strdup("params"), A_PARAMS);
+    struct t_token * ophar = *tokenizer->iter;
+    if (ophar == NULL || ophar->type != T_OPHAR) {
+        tokenizer->error = PARSE_ERROR;
+        free_atom_tree(params);
+        printf("PARSE_PARAMS OPHAR ERR\n");
+        return NULL;
+    }
+    tokenizer->iter++;
+    struct t_token *token;
+    while((token = *(tokenizer->iter)) && token->type != T_CPHAR) {
+        if (token == NULL || token->type != T_IDENTIFIER) {
+            tokenizer->error = PARSE_ERROR;
+            free_atom_tree(params);
+            printf("PARSE_PARAMS IDENTIRIER ERR\n");
+            return NULL;
+        }
+        atom_t *param = new_atom(strdup(token->value), A_VAR);
+        get_freevar(tokenizer, param);
+        add_child_atom(params, param);
+        tokenizer->iter++;
+        token = *tokenizer->iter;
+        if (token == NULL || (token->type != T_COMMA && token->type != T_CPHAR)) {
+            tokenizer->error = PARSE_ERROR;
+            printf("PARSE_PARAMS CPHAR ERR\n");
+            return NULL;
+        }
+        if (token->type == T_COMMA)
+            tokenizer->iter++;
+    }
+    tokenizer->iter++;
+    return params;
+}
+
 atom_t *parse_params(struct t_tokenizer *tokenizer) {
     atom_t * params = new_atom(strdup("params"), A_PARAMS);
     struct t_token * ophar = *tokenizer->iter;
@@ -1077,6 +1125,9 @@ atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
         funcdef = new_atom(strdup(func_name->value), A_GENFUNCDEF);
     else
         funcdef = new_atom(strdup(func_name->value), A_FUNCDEF);
+    printd("function %s context:\n", funcdef->value);
+    g_hash_table_foreach(context, print_freevar_each, NULL);
+    printd("function context ends:\n");
     context = pop_cl_context(tokenizer);
 // TODO functions should be redefined
     freevar_t *function = add_freevar(tokenizer, funcdef);
@@ -1106,8 +1157,6 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
     struct t_token *token = *tokenizer->iter;
     if (token == NULL || token->type != T_IDENTIFIER) {
         printf("PARSE_STMT ASSG IDENTIFIER ERR\n");
-        if (token != NULL)
-            printf("%s:%s\n", token_type_name(token->type), token->value);
         tokenizer->error = PARSE_ERROR;
         return NULL;
     }
@@ -1137,10 +1186,7 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
         stmt = parse_class(tokenizer, current_indent);
     } else {
         struct t_token **prev_iter = tokenizer->iter;
-printf("asdasdasd\n");
         atom_t *var = parse_var(tokenizer, NULL);
-printf("%s %s\n", token->value, token_type_name(token->type));
-printf("%s %s\n", var->value, atom_type_name(var->type));
         if (tokenizer->error == PARSE_ERROR)
             return NULL;
         struct t_token *token = *tokenizer->iter;
@@ -1192,8 +1238,6 @@ printf("%s %s\n", var->value, atom_type_name(var->type));
             }
             add_child_atom(stmt, expr);
         } else if (token->type == T_OPHAR) {
-assert(var != NULL);
-printf("%s\n", atom_type_name(var->type));
             get_freevar(tokenizer, var);
             token = *tokenizer->iter;
             tokenizer->iter = prev_iter;
@@ -1476,13 +1520,12 @@ atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
     }
     tokenizer->iter++;
     atom_t *class = new_atom(strdup(class_name->value), A_CLASS);
-    atom_t *inherits = parse_params(tokenizer);
+    atom_t *inherits = parse_inherits(tokenizer);
     if (tokenizer->error == PARSE_ERROR) {
         free_atom_tree(class);
         return NULL;
     }
     add_child_atom(class, inherits);
-    printf("|%s|\n", (*tokenizer->iter)->value);
     struct t_token *column = *tokenizer->iter;
     if (column == NULL || column->type != T_COLUMN) {
         printf("PARSE_CLASS column ERR\n");

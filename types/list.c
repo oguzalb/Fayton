@@ -4,6 +4,9 @@
     ((object_t **) (void *) glist->data)
 #define get_garray_end(glist) \
     (((object_t **) (void *) glist->data) + (glist->len-1))
+#define g_array_set(glist, item, index) \
+    *((((object_t **))(void *) glist->data) + index) = item
+
 
 object_t *new_listiterator(GArray *args) {
     object_t *list = g_array_index(args, object_t*, 0);
