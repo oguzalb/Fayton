@@ -52,6 +52,7 @@
 #define A_GENFUNCDEF 34
 #define A_SLICE 35
 #define A_TUPLE 36
+#define A_CLOSURE 37
 
 typedef struct _atom_t {
     char *value;

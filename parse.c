@@ -42,7 +42,7 @@ struct t_tokenizer *new_tokenizer(){
 
 void print_freevar_each(gpointer name, gpointer obj, gpointer user_data) {
     freevar_t *freevar = (freevar_t *)obj;
-    printf("name %s cl_index %d\n", (char*) name, freevar->cl_index);
+    printd("name %s cl_index %d\n", (char*) name, freevar->cl_index);
 }
 
 freevar_t *new_freevar(struct t_tokenizer *tokenizer, int type, int cl_index) {
@@ -53,7 +53,7 @@ freevar_t *new_freevar(struct t_tokenizer *tokenizer, int type, int cl_index) {
 }
 
 freevar_t *add_freevar(struct t_tokenizer *tokenizer, atom_t *value) {
-    printf("add_freevar %s\n", value->value);
+    printd("add_freevar %s\n", value->value);
     if (tokenizer->func_contexts == NULL || tokenizer->func_contexts->len == 0)
         return NULL;
     freevar_t *freevar = NULL;
@@ -67,47 +67,51 @@ freevar_t *add_freevar(struct t_tokenizer *tokenizer, atom_t *value) {
     freevar = new_freevar(tokenizer, value->type, count);
     value->cl_index = freevar->cl_index;
     g_hash_table_insert(context, value->value, freevar);
-    printf("name: %s cl_index: %d context_index: %d\n", value->value, value->cl_index, tokenizer->func_contexts->len-1);
+    printd("name: %s cl_index: %d context_index: %d\n", value->value, value->cl_index, tokenizer->func_contexts->len-1);
     return freevar;
 }
 
 freevar_t *get_freevar(struct t_tokenizer *tokenizer, atom_t *value) {
     while (value->type == A_ACCESSOR)
         value = value->child;
-    printf("get_freevar %s\n", value->value);
+    printd("get_freevar %s\n", value->value);
     if (tokenizer->func_contexts == NULL || tokenizer->func_contexts->len == 0)
         return NULL;
     freevar_t *freevar = NULL;
     int i;
     for (i=tokenizer->func_contexts->len-1; i >= 0 && freevar == NULL; i--) {
+        printd("trying to find closure in %d\n", i);
         GHashTable *context = g_array_index(tokenizer->func_contexts, GHashTable*, i);
         freevar = g_hash_table_lookup(context, value->value);
     }
     if (freevar != NULL) {
         int prev_index = freevar->cl_index;
-        for (i++; i < tokenizer->func_contexts->len && freevar == NULL; i++) {
+        printd("adding closure %s to inner contexts\n", value->value, i);
+        for (i+=2; i < tokenizer->func_contexts->len; i++) {
+            printd("added closure %s to %d\n", value->value, i);
             GHashTable *context = g_array_index(tokenizer->func_contexts, GHashTable*, i);
             freevar_t *inner_freevar = new_freevar(context, value->type, prev_index);
+            inner_freevar->type = A_CLOSURE;
             g_hash_table_insert(context, value->value, inner_freevar);
             prev_index = g_hash_table_size(context) - 1;
         }
         value->cl_index = prev_index;
     }
     
-    printf("name: %s cl_index: %d context_index: %d\n", value->value, value->cl_index, tokenizer->func_contexts->len-1);
+    printd("name: %s cl_index: %d context_index: %d\n", value->value, value->cl_index, tokenizer->func_contexts->len-1);
     return freevar;
 }
 
 GHashTable *new_cl_context(struct t_tokenizer *tokenizer) {
-    printf("pushed new context\n");
+    printd("pushed new context\n");
     GHashTable* context = g_hash_table_new(g_str_hash, g_str_equal);
     g_array_append_val(tokenizer->func_contexts, context);
-    printf("context_index: %d\n", tokenizer->func_contexts->len-1);
+    printd("context_index: %d\n", tokenizer->func_contexts->len-1);
     return context;
 }
 
 GHashTable *pop_cl_context(struct t_tokenizer *tokenizer) {
-    printf("popped new context\n");
+    printd("popped new context\n");
     GHashTable* context = g_array_index(tokenizer->func_contexts, GHashTable*, tokenizer->func_contexts->len - 1);
     g_array_remove_index(tokenizer->func_contexts, tokenizer->func_contexts->len - 1);
     return context;
@@ -191,6 +195,7 @@ char *atom_type_name(int type) {
         case A_GENFUNCDEF: return "GENFUNCDEF";
         case A_SLICE: return "SLICE";
         case A_TUPLE: return "TUPLE";
+        case A_CLOSURE: return "CLOSURE";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -1085,6 +1090,22 @@ int block_has_yield(atom_t *atom) {
     return atom->type == A_YIELD | children_has;
 }
 
+void add_closures_to_params(struct t_tokenizer *tokenizer, atom_t *params, GHashTable* context) {
+    GHashTableIter iter;
+    gpointer _key, value;
+
+    g_hash_table_iter_init (&iter, context);
+    while (g_hash_table_iter_next (&iter, &_key, &value)) {
+        char* key = _key;
+        freevar_t *freevar = value;
+	if (freevar->type == A_CLOSURE) {
+            atom_t* closure = new_atom(strdup(key), A_CLOSURE);
+            closure->cl_index = freevar->cl_index;
+            add_child_atom(params, closure);
+        }
+    }
+}
+
 atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
     struct t_token * func_name = *tokenizer->iter;
     if (func_name == NULL || func_name->type != T_IDENTIFIER) {
@@ -1128,6 +1149,7 @@ atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
     printd("function %s context:\n", funcdef->value);
     g_hash_table_foreach(context, print_freevar_each, NULL);
     printd("function context ends:\n");
+    add_closures_to_params(tokenizer, params, context);
     context = pop_cl_context(tokenizer);
 // TODO functions should be redefined
     freevar_t *function = add_freevar(tokenizer, funcdef);

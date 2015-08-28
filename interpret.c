@@ -107,7 +107,7 @@ object_t *lookup_var(GArray *args, atom_t *var) {
     if (obj == NULL) {
         interpreter.error = RUN_ERROR;
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
-        set_exception("Global not found |%s|\n", var->value);
+        set_exception(var->cl_index == -1 ?"Global not found |%s|\n":"Local not found!!!|%s|\n", var->value);
         return NULL;
     }
     return obj;
@@ -117,7 +117,7 @@ object_t *set_var(GArray *args, atom_t *var, object_t* value) {
     object_t *obj;
     printd("set_var cl_index: %d\n", var->cl_index);
     if (var->cl_index == -1) {
-        obj = g_hash_table_insert(interpreter.globals, var->value, value);
+        g_hash_table_insert(interpreter.globals, var->value, value);
     } else {
         if (args->len == var->cl_index)
             g_array_append_val(args, value);
@@ -291,7 +291,7 @@ object_t *interpret_funccall(atom_t *func_call, GArray *args, int current_indent
     if (interpreter.last_accessed)
         print_var("last", interpreter.last_accessed);
     if (func == NULL) {
-        printd("FUNC NOT FOUND |%s|\n", func_call->value);
+        set_exception("FUNC NOT FOUND |%s|\n", func_call->value);
         interpreter.error = RUN_ERROR;
         return NULL;
     }
@@ -314,18 +314,56 @@ object_t *interpret_funccall(atom_t *func_call, GArray *args, int current_indent
             print_var("adding param", interpreter.last_accessed);
             g_array_append_val(inner_args, interpreter.last_accessed);
         }
-        while (param) {
-            object_t *value = interpret_expr(param, args, current_indent);
-            if (interpreter.error == RUN_ERROR) {
+        if (func->type == FUNC_TYPE || func->type == CLASS_TYPE) {
+            while (param) {
+                object_t *value = interpret_expr(param, args, current_indent);
+                if (interpreter.error == RUN_ERROR) {
+                    return NULL;
+                }
+                printd("ADDING ARGUMENT %s\n", param->value);
+                print_var("", value);
+                g_array_append_val(inner_args, value);
+                param = param->next;
+            }
+        } else {
+            atom_t *param_name = func->userfunc_props->ob_userfunc->child->child;
+            if (func_call->child->type == A_ACCESSOR && interpreter.last_accessed != NULL)
+                param_name = param_name->next;
+            while (param && param_name && param_name->type == A_VAR) {
+                object_t *value = interpret_expr(param, args, current_indent);
+                if (interpreter.error == RUN_ERROR) {
+                    return NULL;
+                }
+                printd("ADDING ARGUMENT %s\n", param->value);
+                print_var("", value);
+                g_array_append_val(inner_args, value);
+                param = param->next;
+                param_name = param_name->next;
+            }
+            if (param != NULL) {
+                printd("param type %s\n", object_type_name(param->type));
+                set_exception("Too many params to %s\n", func->userfunc_props->name);
+                interpreter.error = RUN_ERROR;
+                return NULL;
+            } else if (param_name != NULL && param_name->type == A_VAR) {
+                printd("param_name name%s\n", param_name->value);
+                set_exception("More params needed for %s\n", func->userfunc_props->name);
+                interpreter.error = RUN_ERROR;
                 return NULL;
             }
-            printd("ADDING ARGUMENT %s\n", param->value);
-            print_var("", value);
-            g_array_append_val(inner_args, value);
-            param = param->next;
+            atom_t *closure_name = param_name;
+            while (closure_name) {
+                printd("cl_index: %d args_len: %d %s\n", closure_name->cl_index, args->len, atom_type_name(closure_name->type));
+                assert(closure_name->cl_index < args->len);
+                object_t *arg = g_array_index(args, object_t*, closure_name->cl_index);
+                g_array_append_val(inner_args, arg);
+                closure_name = closure_name->next;
+            }
         }
+        
     printd("calling func type %s %s\n", object_type_name(func->type), func->func_props->name);
-    }
+    } else 
+        assert(FALSE);
     printd("ADDED PARAMS\n");
     struct py_thread *thread = get_thread();
     char* func_name;

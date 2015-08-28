@@ -526,7 +526,27 @@ else:\n\
               VAR:__cmp__\n\
             PARAMS:params\n\
               INTEGER:9\n",&tree);
-
+    test_parse_block(
+"def func():\n\
+    a = 5\n\
+    def func2():\n\
+        yield a\n\
+        yield b",
+"BLOCK:block\n\
+  FUNCDEF:func\n\
+    PARAMS:params\n\
+    BLOCK:block\n\
+      ASSIGNMENT:=\n\
+        VAR:a\n\
+        INTEGER:5\n\
+      GENFUNCDEF:func2\n\
+        PARAMS:params\n\
+          CLOSURE:a\n\
+        BLOCK:block\n\
+          YIELD:yield\n\
+            VAR:a\n\
+          YIELD:yield\n\
+            VAR:b\n", &tree);
 
     //fclose(stream);
     return 0;

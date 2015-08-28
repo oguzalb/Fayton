@@ -140,8 +140,18 @@ for i in func():\n\
 "def func(a,b):\n\
     def func2(c,d):\n\
         return c+d\n\
-    func2(a,b)\n\
+    return func2(a,b)\n\
 print(func(1,2))\n", &tree);
+    test_interpret_block(
+"b = 3\n\
+def func():\n\
+    a = 5\n\
+    def func2():\n\
+        yield a\n\
+        yield b\n\
+    return func2()\n\
+for i in func():\n\
+    print(i)", &tree);
 
     return 0;
 }
