@@ -288,10 +288,12 @@ void init_interpreter() {
 object_t *interpret_expr(atom_t *, GArray *, int);
 object_t *interpret_funccall(atom_t *func_call, GArray *args, int current_indent) {
     object_t *func = interpret_expr(func_call->child, args, current_indent);
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
     if (interpreter.last_accessed)
         print_var("last", interpreter.last_accessed);
     if (func == NULL) {
-        set_exception("FUNC NOT FOUND |%s|\n", func_call->value);
+        set_exception("function not found |%s|\n", func_call->value);
         interpreter.error = RUN_ERROR;
         return NULL;
     }
@@ -450,7 +452,10 @@ object_t *interpret_while(atom_t *expr, GArray *args, int current_indent) {
 object_t *interpret_if(atom_t *expr, GArray *args, int current_indent) {
     atom_t *if_block = expr->child;
     while (if_block) {
-        if (if_block->type == A_FUNCCALL) {
+        if (if_block->type == A_BLOCK) {
+            printd("IF CLAUSE FALSE!!!\n");
+            return interpret_block(if_block, args, current_indent);
+        } else {
 // TODO give it to bool
             object_t *bool_obj = interpret_expr(if_block, args, current_indent);
             if (interpreter.error == RUN_ERROR)
@@ -463,14 +468,10 @@ object_t *interpret_if(atom_t *expr, GArray *args, int current_indent) {
             if_block = if_block->next;
             assert(if_block != NULL);
             if (bool_obj->bool_props->ob_bval == TRUE) {
-printd("HEREEEE TRUE!!!\n");
+                printd("IF CLAUSE TRUE!!!\n");
                 return interpret_block(if_block, args, current_indent);
             }
-        } else if (if_block->type == A_BLOCK) {
-printd("HEREEEE FALSE!!!\n");
-            return interpret_block(if_block, args, current_indent);
-        }
-        if_block = if_block->next;
+        }        if_block = if_block->next;
     }
     return NULL;
 }
@@ -524,6 +525,14 @@ object_t *interpret_expr(atom_t *expr, GArray *args, int current_indent) {
         if (interpreter.error == RUN_ERROR)
             return NULL;
         return field;
+    } else if (expr->type == A_NOT) {
+        object_t *result = interpret_expr(expr->child, args, current_indent);
+        if (interpreter.error == RUN_ERROR)
+            return NULL;
+        object_t *bool_obj = new_bool_internal(result);
+        if (interpreter.error == RUN_ERROR)
+            return NULL;
+        return new_bool_from_int(!bool_obj->bool_props->ob_bval);
     } else {
         interpreter.error = RUN_ERROR;
         set_exception("TYPE INCORRECT %s\n", atom_type_name(expr->type));

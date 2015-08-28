@@ -13,16 +13,24 @@ object_t *new_bool_from_int(int value) {
 }
 
 object_t *new_bool_internal(object_t *object) {
-    if (object->type != INT_TYPE) { 
-        printd("NOT INT\n");
+    if (object->type == INT_TYPE) { 
+        return new_bool_from_int(object->int_props->ob_ival);
+    } else if (object->type == STR_TYPE) { 
+        return new_bool_from_int(object->str_props->ob_sval->len);
+    } else if (object->type == BOOL_TYPE){
+        printd("\'returning\' BOOL %s\n", object->bool_props->ob_bval?"True":"False");
+        return object;
+    } else {
+// TODO implement non_zeros
+        printd("NOT boolABLE ( : %s\n", object_type_name(object->type));
         interpreter.error = RUN_ERROR;
         return NULL;
     }
-   return new_bool_from_int(object->int_props->ob_ival);
 }
 
 object_t* new_bool(GArray *args) {
-    object_t *object = g_array_index(args, object_t*, 0);
+    object_t *object = g_array_index(args, object_t*, 1);
+printf("ASHDASD %s\n", object_type_name(object->type));
     return new_bool_internal(object);
 }
 

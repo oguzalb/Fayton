@@ -53,6 +53,7 @@
 #define A_SLICE 35
 #define A_TUPLE 36
 #define A_CLOSURE 37
+#define A_NOT 38
 
 typedef struct _atom_t {
     char *value;

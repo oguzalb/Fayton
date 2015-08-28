@@ -61,7 +61,7 @@ freevar_t *add_freevar(struct t_tokenizer *tokenizer, atom_t *value) {
     freevar = g_hash_table_lookup(context, value->value);
     if (freevar != NULL) {
         printf("freevar found %s\n", value->value);
-        assert(FALSE);
+        return freevar;
     }
     int count = g_hash_table_size(context);
     freevar = new_freevar(tokenizer, value->type, count);
@@ -196,6 +196,7 @@ char *atom_type_name(int type) {
         case A_SLICE: return "SLICE";
         case A_TUPLE: return "TUPLE";
         case A_CLOSURE: return "CLOSURE";
+        case A_NOT: return "NOT";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -377,7 +378,7 @@ atom_t *parse_var(struct t_tokenizer *tokenizer, atom_t *prev_arg) {
             printf("PARSE_VAR PASS_SPACE PARSE ERROR 1\n", token_type_name(token->type));
             return NULL;
         }
-        var = new_atom(strdup(token->value), A_VAR);        
+        var = new_atom(strdup(token->value), A_VAR);
         tokenizer->iter++;
         token = *tokenizer->iter;
     } else {
@@ -770,7 +771,6 @@ atom_t *parse_trailer(struct t_tokenizer *tokenizer) {
 
 atom_t *extract_slice(atom_t *slice);
 atom_t *parse_power(struct t_tokenizer *tokenizer) {
-char buff[2048];
     atom_t *atom = parse_atom(tokenizer);
     if (atom->type == A_VAR)
         get_freevar(tokenizer, atom);
@@ -950,7 +950,6 @@ atom_t *parse_comp(struct t_tokenizer *tokenizer) {
     atom_t *top_comp = NULL;
     while ((token = *tokenizer->iter)!= NULL && (token->type == T_GT || token->type == T_LT || token->type == T_EQUALSEQUALS)) {
         tokenizer->iter++;
-char buff[1024];
         atom_t *equals_accessor = new_atom(strdup("."), A_ACCESSOR);
         atom_t *equals = new_atom(strdup("__eq__"), A_VAR);
         atom_t *equals_call = new_atom(strdup("()call"), A_FUNCCALL);
@@ -983,6 +982,20 @@ char buff[1024];
         top_comp = equals_call;
     }
     return top_comp != NULL? top_comp : shift;
+}
+
+atom_t *parse_not(struct t_tokenizer *tokenizer) {
+    struct t_token *token = *tokenizer->iter;
+    if (token->type == T_IDENTIFIER && !strcmp(token->value, "not")) {
+        tokenizer->iter++;
+        atom_t *not = new_atom(strdup("not"), A_NOT);
+        atom_t *inner_not = parse_not(tokenizer);
+        if (tokenizer->error == PARSE_ERROR)
+            return NULL;
+        add_child_atom(not, inner_not);
+        return not;
+    }
+    return parse_comp(tokenizer);
 }
 
 atom_t *parse_tuple(struct t_tokenizer *tokenizer) {
@@ -1363,7 +1376,7 @@ atom_t *parse_if_else_if(struct t_tokenizer *tokenizer, int current_indent) {
 
 atom_t *parse_if(struct t_tokenizer *tokenizer, int current_indent) {
     atom_t *if_clause = new_atom(strdup("if"), A_IF);
-    atom_t *expr = parse_comp(tokenizer);
+    atom_t *expr = parse_not(tokenizer);
     if (tokenizer->error == PARSE_ERROR) {
         free_atom_tree(if_clause);
         return NULL;

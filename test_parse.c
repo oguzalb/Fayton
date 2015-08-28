@@ -547,6 +547,19 @@ else:\n\
             VAR:a\n\
           YIELD:yield\n\
             VAR:b\n", &tree);
+    test_parse_block(
+"if not False:\n\
+    print(1)",
+"BLOCK:block\n\
+  IF:if\n\
+    NOT:not\n\
+      VAR:False\n\
+    BLOCK:block\n\
+      FUNCCALL:()call\n\
+        VAR:print\n\
+        PARAMS:params\n\
+          INTEGER:1\n",
+&tree);
 
     //fclose(stream);
     return 0;

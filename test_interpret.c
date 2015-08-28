@@ -152,6 +152,12 @@ def func():\n\
     return func2()\n\
 for i in func():\n\
     print(i)", &tree);
+    test_interpret_block(
+"if not False:\n\
+    print(1)", &tree);
+    test_interpret_block(
+"if False:\n\
+    print(1)", &tree);
 
     return 0;
 }
