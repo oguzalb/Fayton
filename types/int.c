@@ -22,6 +22,28 @@ object_t *int_add(GArray *args) {
     return new_int_internal(left->int_props->ob_ival + right->int_props->ob_ival);
 }
 
+object_t *int_mul(GArray *args) {
+    assert(args->len == 2);
+    object_t *left = g_array_index(args, object_t*, 0);
+    object_t *right = g_array_index(args, object_t*, 1);
+    if (left->type != INT_TYPE || right->type != INT_TYPE) {
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
+    return new_int_internal(left->int_props->ob_ival * right->int_props->ob_ival);
+}
+
+object_t *int_div(GArray *args) {
+    assert(args->len == 2);
+    object_t *left = g_array_index(args, object_t*, 0);
+    object_t *right = g_array_index(args, object_t*, 1);
+    if (left->type != INT_TYPE || right->type != INT_TYPE) {
+        interpreter.error = RUN_ERROR;
+        return NULL;
+    }
+    return new_int_internal(left->int_props->ob_ival / right->int_props->ob_ival);
+}
+
 object_t *int_cmp(GArray *args) {
     assert(args->len == 2);
     object_t *left = g_array_index(args, object_t*, 0);
@@ -82,7 +104,9 @@ void init_int() {
     object_t *int_class = new_class(strdup("int"));
     int_class->class_props->ob_func = new_int;
     object_add_field(int_class, "__add__", new_func(int_add, strdup("__add__")));
+    object_add_field(int_class, "__mul__", new_func(int_mul, strdup("__mul__")));
     object_add_field(int_class, "__sub__", new_func(int_sub, strdup("__sub__")));
+    object_add_field(int_class, "__div__", new_func(int_div, strdup("__div__")));
     object_add_field(int_class, "__cmp__", new_func(int_cmp, strdup("__cmp__")));
     object_add_field(int_class, "__eq__", new_func(int_equals, strdup("__eq__")));
     object_add_field(int_class, "__hash__", new_func(int_hash, strdup("__hash__")));
