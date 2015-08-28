@@ -16,6 +16,49 @@ object_t *new_slice(GArray *args) {
         step);
 }
 
+void set_indices(object_t* slice, int last_index, int* start, int* stop, int* step) {
+    object_t *none = new_none_internal();
+    if (slice->slice_props->step == none)
+        *step = 1;
+    else
+        *step = slice->slice_props->step->int_props->ob_ival;
+    if (slice->slice_props->start == none)
+        if (*step < 0)
+            *start = last_index;
+        else
+            *start = 0;
+    else {
+        if (slice->slice_props->start->int_props->ob_ival < 0)
+           *start = last_index + slice->slice_props->start->int_props->ob_ival + 1;
+        else
+           *start = slice->slice_props->start->int_props->ob_ival;
+    }
+    if (slice->slice_props->stop == none)
+        if (*step < 0)
+            *stop = -1;
+        else
+            *stop = last_index + 1;
+    else {
+        if (slice->slice_props->stop->int_props->ob_ival < 0)
+            *stop = last_index + slice->slice_props->stop->int_props->ob_ival + 1;
+        else
+            *stop = slice->slice_props->stop->int_props->ob_ival;
+    }
+    if (*step == 0) {
+        set_exception("Step can not be 0\n");
+        interpreter.error = RUN_ERROR;
+        return;
+    }
+    if (*start < 0)
+        *start = 0;
+    else if (*start > last_index)
+        *start = last_index;
+    if (*stop < -1)
+        *stop = -1;
+    else if (*stop > last_index)
+        *stop = last_index;
+}
+
 object_t *new_slice_internal(object_t *start, object_t *stop, object_t *step) {
     object_t *slice_obj = new_object(SLICE_TYPE);
     slice_obj->slice_props = malloc(sizeof(struct slice_type));

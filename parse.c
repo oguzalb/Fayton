@@ -515,6 +515,8 @@ printd("%s++\n", token->value);
             add_child_atom(funccall, params);
             add_child_atom(params, first_arg);
             add_child_atom(slicecont, funccall);
+            if (first_arg->next->next == NULL)
+                add_child_atom(params, new_atom(strdup("None"), A_VAR));
             return slicecont;
         }
         if (token->type != T_COLUMN) {

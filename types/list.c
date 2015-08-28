@@ -171,12 +171,12 @@ object_t *list_getitem(GArray *args) {
         int i = slice->int_props->ob_ival;
         int len = list->list_props->ob_aval->len;
         if (i < 0) {
-            i = len + i;
-            if (i < 0) {
-                set_exception("index out of range\n");
-                interpreter.error = RUN_ERROR;
-                return NULL;
-            }
+            i += len;
+        }
+        if (i < 0 || i >= len) {
+            set_exception("index out of range\n");
+            interpreter.error = RUN_ERROR;
+            return NULL;
         }
         return g_array_index(list->list_props->ob_aval, object_t *, i);
     }
@@ -185,49 +185,29 @@ object_t *list_getitem(GArray *args) {
         interpreter.error = RUN_ERROR;
         return NULL;
     }
+    if (list->list_props->ob_aval->len == 0)
+        return new_list_internal();
     printd("Creating slice list\n");
-    object_t *none = new_none_internal();
     object_t **glist_begin = get_garray_begin(list->list_props->ob_aval);
     object_t **glist_end = get_garray_end(list->list_props->ob_aval);
-    object_t **glist_stop;
-    object_t **glist_start;
-    int step;
-    if (slice->slice_props->step == none)
-        step = 1;
-    else
-        step = slice->slice_props->step->int_props->ob_ival;
-    if (slice->slice_props->start == none)
-        if (step < 0)
-            glist_start = get_garray_end(list->list_props->ob_aval);
-        else
-            glist_start = glist_begin;
-    else {
-        if (slice->slice_props->start->int_props->ob_ival < 0)
-           glist_start = glist_end + slice->slice_props->start->int_props->ob_ival + 1;
-        else
-           glist_start = glist_begin + slice->slice_props->start->int_props->ob_ival;
-    }
-    if (slice->slice_props->stop == none)
-        if (step < 0)
-            glist_stop = glist_begin - 1;
-        else
-            glist_stop = glist_end + 1;
-    else {
-        if (slice->slice_props->stop->int_props->ob_ival < 0)
-            glist_stop = glist_end + slice->slice_props->stop->int_props->ob_ival + 2;
-        else
-            glist_stop = glist_begin + slice->slice_props->stop->int_props->ob_ival + 1;
-    }
-    if (step == 0) {
-        set_exception("Step can not be 0\n");
-        interpreter.error = RUN_ERROR;
+
+    int start, stop, step;
+    int last_index = list->list_props->ob_aval->len - 1;
+    set_indices(slice, last_index, &start, &stop, &step);
+    if (interpreter.error == RUN_ERROR)
         return NULL;
-    }
+    object_t **glist_stop = glist_begin + stop;
+    object_t **glist_start = glist_begin + start;
     object_t *sl_list = new_list_internal();
-    int stop_cond = glist_start > glist_stop;
-    for (;stop_cond == (glist_start > glist_stop) && glist_start >= glist_begin; glist_start += step) {
-        g_array_append_val(sl_list->list_props->ob_aval, *glist_start);
-    }
+    int stop_cond = glist_start >= glist_stop;
+    if (step > 0)
+        for (;glist_start < glist_stop && glist_start >= glist_begin && glist_start <= glist_end; glist_start += step) {
+            g_array_append_val(sl_list->list_props->ob_aval, *glist_start);
+        }
+    else
+        for (;glist_start > glist_stop && glist_start >= glist_begin && glist_start <= glist_end; glist_start += step) {
+            g_array_append_val(sl_list->list_props->ob_aval, *glist_start);
+        }
     return sl_list;
 }
 
