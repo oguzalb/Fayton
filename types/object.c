@@ -121,6 +121,30 @@ object_t *object_str(GArray *args) {
     return object_call_repr(self);
 }
 
+object_t *object_and(GArray *args) {
+    object_t *self = (object_t *)g_array_index(args, object_t *, 0);
+    object_t *other = (object_t *)g_array_index(args, object_t *, 1);
+    object_t *self_bool = new_bool_internal(self);
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
+    object_t *other_bool = new_bool_internal(other);
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
+    return new_bool_from_int(self_bool->bool_props->ob_bval & other_bool->bool_props->ob_bval);
+}
+
+object_t *object_or(GArray *args) {
+    object_t *self = (object_t *)g_array_index(args, object_t *, 0);
+    object_t *other = (object_t *)g_array_index(args, object_t *, 1);
+    object_t *self_bool = new_bool_internal(self);
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
+    object_t *other_bool = new_bool_internal(other);
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
+    return new_bool_internal(self_bool->bool_props->ob_bval | other_bool->bool_props->ob_bval);
+}
+
 object_t *object_call_str(object_t *object) {
     object_t *item_str = object_call_func_no_param(object, "__str__");
     if (interpreter.error == RUN_ERROR)
@@ -195,6 +219,8 @@ void init_object() {
     object_class->class_props->ob_func = new_object_instance;
     object_add_field(object_class, "__str__", new_func(object_str, strdup("__str__")));
     object_add_field(object_class, "__eq__", new_func(object_equals, strdup("__eq__")));
+    object_add_field(object_class, "__and__", new_func(object_and, strdup("__and__")));
+    object_add_field(object_class, "__or__", new_func(object_or, strdup("__or__")));
     object_add_field(object_class, "__repr__", new_func(object_repr, strdup("__repr__")));
     register_global(strdup("object"), object_class);
 }

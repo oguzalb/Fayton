@@ -20,9 +20,13 @@ object_t *new_bool_internal(object_t *object) {
     } else if (object->type == BOOL_TYPE){
         printd("\'returning\' BOOL %s\n", object->bool_props->ob_bval?"True":"False");
         return object;
+    } else if (object->type == LIST_TYPE) {
+        return new_bool_from_int(object->list_props->ob_aval->len);
+    } else if (object->type == DICTIONARY_TYPE) {
+        return new_bool_from_int(g_hash_table_size(object->dict_props->ob_dval));
     } else {
 // TODO implement non_zeros
-        printd("NOT boolABLE ( : %s\n", object_type_name(object->type));
+        set_exception("NOT boolABLE ( : %s\n", object_type_name(object->type));
         interpreter.error = RUN_ERROR;
         return NULL;
     }

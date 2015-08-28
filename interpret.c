@@ -457,7 +457,10 @@ object_t *interpret_if(atom_t *expr, GArray *args, int current_indent) {
             return interpret_block(if_block, args, current_indent);
         } else {
 // TODO give it to bool
-            object_t *bool_obj = interpret_expr(if_block, args, current_indent);
+            object_t *expr = interpret_expr(if_block, args, current_indent);
+            if (interpreter.error == RUN_ERROR)
+                return NULL;
+            object_t *bool_obj = new_bool_internal(expr);
             if (interpreter.error == RUN_ERROR)
                 return NULL;
             if (bool_obj->type != BOOL_TYPE) {
