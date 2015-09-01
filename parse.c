@@ -197,6 +197,7 @@ char *atom_type_name(int type) {
         case A_TUPLE: return "TUPLE";
         case A_CLOSURE: return "CLOSURE";
         case A_NOT: return "NOT";
+        case A_KWARG: return "KWARG";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -460,13 +461,28 @@ atom_t *parse_callparams(struct t_tokenizer *tokenizer) {
         return NULL;
     add_child_atom(params, first_arg);
     atom_t *prev_arg = first_arg;
+    int kwargs_start = FALSE;
     while (TRUE) {
+        token = *tokenizer->iter;
+        if (token->type == T_EQUALS) {
+            tokenizer->iter++;
+            kwargs_start = TRUE;
+            atom_t *value = parse_expr(tokenizer);
+            if (tokenizer->error == PARSE_ERROR)
+                return NULL;
+            add_child_atom(prev_arg, value);
+        } else if (kwargs_start == TRUE) {
+            tokenizer->error = PARSE_ERROR;
+            free_atom_tree(params);
+            printf("PARSE_CALLPARAMS KWARG BEFORE ARG\n");
+            return NULL;
+        }
         token = *tokenizer->iter;
 printd("%s++\n", token->value);
         if (token->type == T_CPHAR) {
             return params;
         }
-        if (token->type != T_COMMA) {
+       if (token->type != T_COMMA) {
 printf("PARSE_CALLPARAMS COMMA ERR %s %s\n", token->value, token_type_name(token->type));
             tokenizer->error = PARSE_ERROR;
             free_atom_tree(params);
@@ -476,7 +492,7 @@ printf("PARSE_CALLPARAMS COMMA ERR %s %s\n", token->value, token_type_name(token
         atom_t *arg = parse_expr(tokenizer);
         if (tokenizer->error == PARSE_ERROR)
             return NULL;
-        prev_arg->next = arg;
+       prev_arg->next = arg;
         prev_arg = arg;
     }
 }
@@ -1135,6 +1151,7 @@ atom_t *parse_params(struct t_tokenizer *tokenizer) {
     }
     tokenizer->iter++;
     struct t_token *token;
+    int kwargs_start = FALSE;
     while((token = *(tokenizer->iter)) && token->type != T_CPHAR) {
         if (token == NULL || token->type != T_IDENTIFIER) {
             tokenizer->error = PARSE_ERROR;
@@ -1146,6 +1163,27 @@ atom_t *parse_params(struct t_tokenizer *tokenizer) {
         add_freevar(tokenizer, param);
         add_child_atom(params, param);
         tokenizer->iter++;
+        token = *tokenizer->iter;
+        if (token == NULL) {
+            tokenizer->error = PARSE_ERROR;
+            free_atom_tree(params);
+            printf("PARSE_PARAMS IDENTIRIER ERR\n");
+            return NULL;
+        }
+        if (token->type == T_EQUALS) {
+            param->type = A_KWARG;
+            tokenizer->iter++;
+            kwargs_start = TRUE;
+            atom_t *default_val = parse_expr(tokenizer);
+            if (tokenizer->error == PARSE_ERROR)
+                return NULL;
+            add_child_atom(param, default_val);
+        } else if (kwargs_start == TRUE) {
+            tokenizer->error = PARSE_ERROR;
+            free_atom_tree(params);
+            printf("PARSE_PARAMS KWARG BEFORE ARG\n");
+            return NULL;
+        }
         token = *tokenizer->iter;
         if (token == NULL || (token->type != T_COMMA && token->type != T_CPHAR)) {
             tokenizer->error = PARSE_ERROR;

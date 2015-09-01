@@ -158,7 +158,16 @@ for i in func():\n\
     test_interpret_block(
 "if False:\n\
     print(1)", &tree);
-
+    test_interpret_block(
+"def func(name=None):\n\
+    print(name)\n\
+func()\n", &tree);
+    test_interpret_block(
+"def func(a, b=1):\n\
+    def func2():\n\
+        return a + b\n\
+    return func2()\n\
+print(func(1))\n", &tree);
     return 0;
 }
 

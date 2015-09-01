@@ -100,7 +100,7 @@ object_t *lookup_var(GArray *args, atom_t *var) {
     if (var->cl_index == -1) {
         obj = g_hash_table_lookup(interpreter.globals, var->value);
         printd("var search from globals\n");
-    } else {
+    } else if (var->cl_index < args->len){
         obj = g_array_index(args, object_t *, var->cl_index);
         printd("var search from locals\n");
     }
@@ -150,11 +150,12 @@ object_t *new_func(object_t *(*func)(GArray *), char *name) {
     return func_obj;
 }
 
-object_t *new_user_func(atom_t *func, char* name) {
+object_t *new_user_func(atom_t *func, char* name, GHashTable *kwargs) {
     object_t *func_obj = new_object(USERFUNC_TYPE);
     func_obj->userfunc_props = malloc(sizeof(struct userfunc_type));
     func_obj->userfunc_props->ob_userfunc = func;
     func_obj->userfunc_props->name = name;
+    func_obj->userfunc_props->kwargs = kwargs;
     func_obj->class = NULL;
     return func_obj;
 }
@@ -305,7 +306,6 @@ object_t *interpret_funccall(atom_t *func_call, GArray *args, int current_indent
     printd("FUNC FOUND |%s|\n", func_call->value);
     
     GArray *inner_args;
-    // TODO should be done in a better way, just poc
     if (func->type == FUNC_TYPE || func->type == CLASS_TYPE || func->type == USERFUNC_TYPE || func->type == GENERATORFUNC_TYPE) {
         inner_args = g_array_new(TRUE, TRUE, sizeof(object_t *));
         atom_t *param = func_call->child->next->child;
@@ -318,6 +318,7 @@ object_t *interpret_funccall(atom_t *func_call, GArray *args, int current_indent
         }
         if (func->type == FUNC_TYPE || func->type == CLASS_TYPE) {
             while (param) {
+// TODO kwargs should be supported for builtins
                 object_t *value = interpret_expr(param, args, current_indent);
                 if (interpreter.error == RUN_ERROR) {
                     return NULL;
@@ -342,17 +343,51 @@ object_t *interpret_funccall(atom_t *func_call, GArray *args, int current_indent
                 param = param->next;
                 param_name = param_name->next;
             }
+            GHashTable *inner_kwargs = g_hash_table_new(g_str_hash, g_str_equal);
+            atom_t *kwarg_name = param_name;
+            // kwargs without names
+            while (param && (param->type != A_VAR || param->child == NULL) && param_name && param_name->type == A_KWARG) {
+                printd("adding kwarg %s\n", param_name->value);
+                object_t *value = interpret_expr(param, args, current_indent);
+                if (interpreter.error == RUN_ERROR) {
+                    return NULL;
+                }
+                g_hash_table_insert(inner_kwargs, param_name->value, value);
+                param_name = param_name->next;
+                param = param->next;
+            }
+            // kwargs with names
+            while (param) {
+                assert(param->child != NULL);
+                printd("adding named kwarg %s\n", param->value);
+                object_t *value = interpret_expr(param->child, args, current_indent);
+                if (interpreter.error == RUN_ERROR) {
+                    return NULL;
+                }
+                g_hash_table_insert(inner_kwargs, param->value, value);
+                param = param->next;
+            }
+            while (kwarg_name && kwarg_name->type == A_KWARG) {
+                object_t *value = g_hash_table_lookup(inner_kwargs, kwarg_name->value);
+                if (value == NULL)
+                    value = g_hash_table_lookup(func->userfunc_props->kwargs, kwarg_name->value);
+                assert(value != NULL);
+                g_array_append_val(inner_args, value);
+                kwarg_name = kwarg_name->next;
+            }
+            g_hash_table_destroy(inner_kwargs);
             if (param != NULL) {
                 printd("param type %s\n", object_type_name(param->type));
                 set_exception("Too many params to %s\n", func->userfunc_props->name);
                 interpreter.error = RUN_ERROR;
                 return NULL;
             } else if (param_name != NULL && param_name->type == A_VAR) {
-                printd("param_name name%s\n", param_name->value);
+                printd("param_name %s\n", param_name->value);
                 set_exception("More params needed for %s\n", func->userfunc_props->name);
                 interpreter.error = RUN_ERROR;
                 return NULL;
             }
+            while (param_name && param_name->type == A_KWARG) param_name = param_name->next;
             atom_t *closure_name = param_name;
             while (closure_name) {
                 printd("cl_index: %d args_len: %d %s\n", closure_name->cl_index, args->len, atom_type_name(closure_name->type));
@@ -608,7 +643,21 @@ printd("A_IF\n");
 printd("A_WHILE\n");
         return interpret_while(stmt, args, current_indent);
     } else if (stmt->type == A_FUNCDEF) {
-        object_t *userfunc = new_user_func(stmt, strdup(stmt->value));
+        atom_t *param = stmt->child->child;
+        GHashTable *kwargs = NULL; 
+        while (param && param->child == NULL)
+            param = param->next;
+        if (param != NULL) {
+            kwargs = g_hash_table_new(g_str_hash, g_str_equal);
+            while (param != NULL) {
+                object_t *value = interpret_expr(param->child, args, current_indent);
+                if (interpreter.error == RUN_ERROR)
+                    return NULL;
+                g_hash_table_insert(kwargs, strdup(param->value), value);
+                param = param->next;
+            }
+        }
+        object_t *userfunc = new_user_func(stmt, strdup(stmt->value), kwargs);
         set_var(args, stmt, userfunc);
     } else if (stmt->type == A_GENFUNCDEF) {
         object_t *generatorfunc = new_generator_func(stmt, strdup(stmt->value));
@@ -623,7 +672,22 @@ printd("A_WHILE\n");
             if (field->type == A_FUNCDEF) {
                 char *trace_str;
                 asprintf(&trace_str, "%s.%s", class_name->value, field->value);
-                object_t *class_func = new_user_func(field, trace_str);
+ 
+                atom_t *param = stmt->child->child;
+                GHashTable *kwargs = NULL; 
+                while (param && param->child == NULL)
+                    param = param->next;
+                if (param != NULL) {
+                    kwargs = g_hash_table_new(g_str_hash, g_str_equal);
+                    while (param != NULL && param->child != NULL) {
+                        object_t *value = interpret_expr(param->child, args, current_indent);
+                       if (interpreter.error == RUN_ERROR)
+                            return NULL;
+                        g_hash_table_insert(kwargs, param->value, value);
+                    }
+                }
+ 
+                object_t *class_func = new_user_func(field, trace_str, kwargs);
                 object_add_field(class, field->value, class_func);
                 printd("added class field func %s.%s\n", class_name->value, field->value);
             } else if (field->type == A_GENFUNCDEF) {

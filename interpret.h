@@ -64,6 +64,7 @@ struct func_type {
 struct userfunc_type {
     atom_t *ob_userfunc;
     char *name;
+    GHashTable *kwargs;
 };
 
 struct generatorfunc_type {
@@ -108,6 +109,10 @@ typedef struct _object {
         struct slice_type *slice_props;
     };
 } object_t;
+
+typedef struct _kwarg_t {
+    object_t *default_val;
+} kwarg_t;
 
 struct py_thread {
     GArray *stack_trace;
