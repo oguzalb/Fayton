@@ -168,6 +168,10 @@ func()\n", &tree);
         return a + b\n\
     return func2()\n\
 print(func(1))\n", &tree);
+    test_interpret_block(
+"for i,j in [[1,2], [3,4]]:\n\
+    print(i)\n\
+    print(j)\n", &tree);
     return 0;
 }
 

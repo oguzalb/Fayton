@@ -21,7 +21,7 @@ object_t *listiterator_next(object_t **args) {
     object_t *iterator = args[0];
     object_t **objectp = iterator->listiterator_props->objectp;
     if (*objectp != NULL)
-        iterator->listiterator_props->objectp++;;
+        iterator->listiterator_props->objectp++;
     return *objectp;
 }
 

@@ -611,11 +611,35 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
         object_t *params[2] = {iterator, NULL};
         object_t *item;
         while(item = object_call_func_obj(next_func, params)) {
-            if (var_name->type == A_TUPLE) {
-                set_exception("tuples for for loop not implemented yet\n");
+            if (interpreter.error == RUN_ERROR)
                 return NULL;
+            if (var_name->type == A_TUPLE) {
+                object_t *tuple_it = object_call_func_no_param(item, "__iter__");
+                if (interpreter.error == RUN_ERROR)
+                    return NULL;
+                object_t *next_func = object_get_field(tuple_it, "next");
+                if (interpreter.error == RUN_ERROR)
+                    return NULL;
+                object_t *next_params[2] = {tuple_it, NULL};
+                object_t *tuple_item;
+                atom_t *tuple_item_name = var_name->child;
+                while ((tuple_item = object_call_func_obj(next_func, next_params)) && tuple_item_name != NULL) {
+                    if (interpreter.error == RUN_ERROR)
+                        return NULL;
+                    if (tuple_item_name->type != A_VAR) {
+                        set_exception("recursuve tuple unpack is not implemented yet\n");
+                        return NULL;
+                    }
+                    set_var(args, tuple_item_name, tuple_item);
+                    tuple_item_name = tuple_item_name->next;
+                }
+                if (tuple_item != NULL || tuple_item_name != NULL) {
+                    set_exception("Error while unpacking %p %s\n", tuple_item, tuple_item_name->value);
+                    return NULL;
+                }
+            } else {
+                set_var(args, var_name, item);
             }
-            set_var(args, var_name, item);
             interpret_block(block, args, current_indent);
             if (interpreter.error == RUN_ERROR) {
                 return NULL;
