@@ -1,7 +1,11 @@
 #include "dict.h"
 
-object_t *dict_keys(GArray *args) {
-    object_t *self = g_array_index(args, object_t*, 0);
+object_t *dict_keys(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("one argument expected\n");
+        return NULL;
+    }
+    object_t *self = args[0];
     GList *keys = g_hash_table_get_keys(self->dict_props->ob_dval);
     object_t *keysobj = new_list(NULL);
     GList *iter = keys;
@@ -14,8 +18,12 @@ object_t *dict_keys(GArray *args) {
     return keysobj;
 }
 
-object_t *dict_values(GArray *args) {
-    object_t *self = g_array_index(args, object_t*, 0);
+object_t *dict_values(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("one argument expected\n");
+        return NULL;
+    }
+    object_t *self = args[0];
     GList *values = g_hash_table_get_values(self->dict_props->ob_dval);
     object_t *valuesobj = new_list(NULL);
     GList *iter = values;
@@ -28,11 +36,15 @@ object_t *dict_values(GArray *args) {
     return valuesobj;
 }
 
-object_t *dict_repr(GArray *args) {
+object_t *dict_repr(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("one argument expected\n");
+        return NULL;
+    }
     GHashTableIter iter;
     gpointer key, value;
 
-    object_t *self = g_array_index(args, object_t *, 0);
+    object_t *self = args[0];
     char *str = NULL;
     char *cursor = NULL;
     cursor = fay_strcat(&str, "{", cursor);
@@ -54,42 +66,46 @@ object_t *dict_repr(GArray *args) {
     return  new_str_internal(str);
 }
 
-object_t *dict_get(GArray *args) {
-    if (args->len != 2) {
-        interpreter.error = RUN_ERROR;
-        set_exception("expected 2 arguments\n");
+object_t *dict_get(object_t **args) {
+    int count = args_len(args);
+    if (count != 2 && count != 3) {
+        set_exception("Two/Three arguments expected\n");
         return NULL;
     }
-    object_t *self = g_array_index(args, object_t *, 0);
-    object_t *key = g_array_index(args, object_t *, 1);
+    object_t *self = args[0];
+    object_t *key = args[1];
     object_t *obj = g_hash_table_lookup(self->dict_props->ob_dval, key);
-    return obj != NULL ? obj : new_none_internal();
+    return obj != NULL ? obj : (args[2]?args[2]:new_none_internal());
 }
 
-object_t *dict_getitem(GArray *args) {
+object_t *dict_getitem(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("Two arguments expected\n");
+        return NULL;
+    }
     object_t *value = dict_get(args);
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
     if (value == NULL || value->type == NONE_TYPE) {
         set_exception("KeyError");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     return value;
 }
 
-object_t *dict_setitem(GArray *args) {
-    if (args->len != 3) {
-        interpreter.error = RUN_ERROR;
+object_t *dict_setitem(object_t **args) {
+    if (args_len(args) != 3) {
         set_exception("expected 3 arguments\n");
         return NULL;
     }
-    object_t *self = g_array_index(args, object_t *, 0);
-    object_t *key = g_array_index(args, object_t *, 1);
-    object_t *val = g_array_index(args, object_t *, 2);
+    object_t *self = args[0];
+    object_t *key = args[1];
+    object_t *val = args[2];
     g_hash_table_insert(self->dict_props->ob_dval, key, val);
     return new_none_internal();
 }
 
-object_t *new_dict(GArray *args) {
+object_t *new_dict(object_t **args) {
     // TODO args check
     object_t * dict = new_object(DICTIONARY_TYPE);
     dict->class = get_global("dict");

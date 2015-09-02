@@ -8,7 +8,7 @@
 // TODO exceptions?
 
 struct gen_thread_data_t {
-    GArray *args;
+    object_t **args;
     object_t *generator;
 };
 
@@ -44,7 +44,7 @@ pthread_setspecific(py_thread_key, p);
 // StopIterationException when exceptions get fully implemented
 }
 
-void generator_start(object_t *generator, GArray *args, object_t *run_func) {
+void generator_start(object_t *generator, object_t **args, object_t *run_func) {
     struct gen_thread_data_t *thread_data = malloc(sizeof(struct gen_thread_data_t));
     GMutex *mutex = malloc(sizeof(GMutex));
     g_mutex_init(mutex);
@@ -63,9 +63,13 @@ void generator_start(object_t *generator, GArray *args, object_t *run_func) {
     g_mutex_unlock(mutex);
 }
 
-object_t *generator_next(GArray *args) {
+object_t *generator_next(object_t **args) {
     printd("Started next\n");
-    object_t *generator = g_array_index(args, object_t *, 0);
+    if (args_len(args) != 1) {
+        set_exception("Expected one argument\n");
+        return NULL;
+    }
+    object_t *generator = args[0];
     struct py_thread *thread = get_thread();
     struct GThread *gen_thread = generator->generatorfunc_props->ob_thread;
     GCond *cond = generator->generatorfunc_props->cond;
@@ -87,13 +91,13 @@ object_t *generator_next(GArray *args) {
     return result;
 }
 
-object_t *generator_iter(GArray *args) {
-    object_t *generator = g_array_index(args, object_t *, 0);
+object_t *generator_iter(object_t **args) {
+    object_t *generator = args[0];
     return generator;
 }
 
 static object_t *generator_class;
-object_t *new_generator_internal(GArray *args, object_t* run_func) {
+object_t *new_generator_internal(object_t **args, object_t* run_func) {
     object_t *generator = new_object(GENERATORFUNC_TYPE);
     generator->generatorfunc_props = malloc(sizeof(struct generatorfunc_type));
     generator->generatorfunc_props->ob_thread = NULL;

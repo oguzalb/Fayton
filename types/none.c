@@ -6,10 +6,14 @@ object_t *new_none_internal() {
     return none_obj;
 }
 
-object_t *none_repr_func(GArray *args) {
+object_t *none_repr_func(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("An argument expected\n");
+        return NULL;
+    }
     static object_t *none_repr = NULL;
     if (none_repr == NULL) {
-        object_t *self = g_array_index(args, object_t *, 0);
+        object_t *self = args[0];
         char *str = strdup("None");
         none_repr = new_str_internal(str);
     }

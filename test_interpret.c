@@ -31,7 +31,7 @@ void test_interpret_block(char *code, atom_tree_t *tree) {
     printd("initializing interpreter\n", buff);
     init_interpreter();
     printd("interpreting\n", buff);
-    interpret_block(tree->root, interpreter.globals, 0);
+    interpret_block(tree->root, NULL, 0);
     if (interpreter.error == RUN_ERROR) {
         struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
         print_stack_trace(main_thread);
@@ -59,7 +59,7 @@ void test_interpret_block_fail(char *code, atom_tree_t *tree) {
     printd("initializing interpreter\n", buff);
     init_interpreter();
     printd("interpreting\n", buff);
-    interpret_block(tree->root, interpreter.globals, 0);
+    interpret_block(tree->root, NULL, 0);
     assert(interpreter.error == RUN_ERROR);
     struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
     print_stack_trace(main_thread);
@@ -159,7 +159,7 @@ for i in func():\n\
 "if False:\n\
     print(1)", &tree);
     test_interpret_block(
-"def func(name=None):\n\
+"def func(name=\"something\"):\n\
     print(name)\n\
 func()\n", &tree);
     test_interpret_block(

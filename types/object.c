@@ -2,8 +2,6 @@
 
 object_t *object_class = NULL;
 
-object_t *object_call_func_obj(object_t *func, object_t **param_objs);
-
 gboolean object_equal(gconstpointer a, gconstpointer b) {
     // TODO should call equals function for different types
     object_t *aobj = (object_t *)a;
@@ -17,7 +15,6 @@ gboolean object_equal(gconstpointer a, gconstpointer b) {
         return FALSE;
     if (res->type != BOOL_TYPE) {
         set_exception("__eq__ should return bool type");
-        interpreter.error == RUN_ERROR;
         return FALSE;
     }
     return res->bool_props->ob_bval;
@@ -29,7 +26,7 @@ guint object_hash(gconstpointer key) {
     object_t *hash_func = object_get_field_no_check(object, "__hash__");
     if (hash_func == NULL)
         return g_direct_hash(object);
-    object_t *hash_obj = object_call_func_obj_no_param(object, hash_func);
+    object_t *hash_obj = object_call_func_no_param(object, "__hash__");
     return hash_obj->int_props->ob_ival;
 }
 
@@ -40,51 +37,26 @@ object_t *new_object(int type) {
     return object;
 }
 
-object_t *new_object_instance(GArray *args) {
+object_t *new_object_instance(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("An argument expected\n");
+        return NULL;
+    }
     object_t *object = (object_t *) malloc(sizeof(object_t));
     object->fields = g_hash_table_new(g_str_hash, g_str_equal);
-    object->class = (object_t *)g_array_index(args, object_t *, 0);
+    object->class = args[0];
     object->type = CUSTOMOBJECT_TYPE;
     return object;
 }
 
 object_t *object_call_func_obj(object_t *func, object_t **param_objs) {
-   object_t *result;
-   if (func->type == USERFUNC_TYPE || func->type == GENERATORFUNC_TYPE) {
-        set_exception("Not supported yet\n");
-        interpreter.error = RUN_ERROR;
-        return NULL;
+    object_t *result = NULL;
+    if (func->type == USERFUNC_TYPE || func->type == GENERATORFUNC_TYPE) {
+        result = interpret_funcblock(func->userfunc_props->ob_userfunc->child->next, param_objs, /* TODO */0);
     } else if (func->type == FUNC_TYPE) {
-        GArray *params = g_array_new(TRUE, TRUE, sizeof(object_t *));
-        while (*param_objs != NULL) {
-            g_array_append_val(params, (*param_objs));
-            param_objs++;
-        }
-        result = func->func_props->ob_func(params);
-        g_array_free(params, FALSE);
+        result = func->func_props->ob_func(param_objs);
     } else {
         set_exception("field should be a function.");
-        interpreter.error = RUN_ERROR;
-        return NULL;
-    }
-    return result;
-}
-
-object_t *object_call_func_obj_no_param(object_t *object, object_t *func) {
-   object_t *result;
-   if (func->type == USERFUNC_TYPE || func->type == GENERATORFUNC_TYPE) {
-        GHashTable *sub_context = g_hash_table_new(g_str_hash, g_str_equal);
-        g_hash_table_insert(sub_context, "self", object);
-        result = interpret_funcblock(func->userfunc_props->ob_userfunc->child->next, sub_context, 0);
-        g_hash_table_destroy(sub_context);
-    } else if (func->type == FUNC_TYPE) {
-        GArray *params = g_array_new(TRUE, TRUE, sizeof(object_t *));
-        g_array_append_val(params, object);
-        result = func->func_props->ob_func(params);
-        g_array_free(params, FALSE);
-    } else {
-        set_exception("field should be a function.");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     return result;
@@ -94,7 +66,8 @@ object_t *object_call_func_no_param(object_t *object, char *func_name) {
    object_t *func = object_get_field(object, func_name);
    if (interpreter.error == RUN_ERROR)
        return NULL;
-   return object_call_func_obj_no_param(object, func);
+   object_t *params[2] = {object, NULL};
+   return object_call_func_obj(func, params);
 }
 
 object_t *object_call_repr(object_t *object) {
@@ -103,27 +76,38 @@ object_t *object_call_repr(object_t *object) {
         return NULL;
     if (item_str->type != STR_TYPE) {
         set_exception("__repr__ should be a function returning string");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     return item_str;
 }
 
-object_t *object_repr(GArray *args) {
+object_t *object_repr(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("An argument expected\n");
+        return NULL;
+    }
     char* str;
-    object_t *self = (object_t *)g_array_index(args, object_t *, 0);
+    object_t *self = args[0];
     asprintf(&str, "< %s instance %p >", self->class_props->name, self);
     return new_str_internal(str);
 }
 
-object_t *object_str(GArray *args) {
-    object_t *self = (object_t *)g_array_index(args, object_t *, 0);
+object_t *object_str(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("An argument expected\n");
+        return NULL;
+    }
+    object_t *self = args[0];
     return object_call_repr(self);
 }
 
-object_t *object_and(GArray *args) {
-    object_t *self = (object_t *)g_array_index(args, object_t *, 0);
-    object_t *other = (object_t *)g_array_index(args, object_t *, 1);
+object_t *object_and(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("Two arguments expected\n");
+        return NULL;
+    }
+    object_t *self = args[0];
+    object_t *other = args[1];
     object_t *self_bool = new_bool_internal(self);
     if (interpreter.error == RUN_ERROR)
         return NULL;
@@ -133,9 +117,13 @@ object_t *object_and(GArray *args) {
     return new_bool_from_int(self_bool->bool_props->ob_bval & other_bool->bool_props->ob_bval);
 }
 
-object_t *object_or(GArray *args) {
-    object_t *self = (object_t *)g_array_index(args, object_t *, 0);
-    object_t *other = (object_t *)g_array_index(args, object_t *, 1);
+object_t *object_or(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("Two arguments expected\n");
+        return NULL;
+    }
+    object_t *self = args[0];
+    object_t *other = args[1];
     object_t *self_bool = new_bool_internal(self);
     if (interpreter.error == RUN_ERROR)
         return NULL;
@@ -151,15 +139,18 @@ object_t *object_call_str(object_t *object) {
         return NULL;
     if (item_str->type != STR_TYPE) {
         set_exception("__str__ should be a function returning string");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     return item_str;
 }
 
-object_t *object_equals(GArray *args) {
-    object_t *left = g_array_index(args, object_t*, 0);
-    object_t *right = g_array_index(args, object_t*, 1);
+object_t *object_equals(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("Two arguments expected\n");
+        return NULL;
+    }
+    object_t *left = args[0];
+    object_t *right = args[1];
     object_t *cmp_func = object_get_field_no_check(left, "__cmp__");
     if (cmp_func == NULL) {
         return new_bool_from_int(left == right);
@@ -203,7 +194,6 @@ object_t *object_get_field_no_check(object_t *object, char* name) {
 object_t *object_get_field(object_t *object, char *name) {
     object_t *field = object_get_field_no_check(object, name);
     if (field == NULL) {
-        interpreter.error = RUN_ERROR;
         set_exception("Field not found %s\n", name);
         return NULL;
     }

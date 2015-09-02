@@ -8,41 +8,54 @@
     *((((object_t **))(void *) glist->data) + index) = item
 
 
-object_t *new_listiterator(GArray *args) {
-    object_t *list = g_array_index(args, object_t*, 0);
+object_t *new_listiterator(object_t **args) {
+    object_t *list = args[0];
     return new_listiterator_internal(list);
 }
 
-object_t *listiterator_next(GArray *args) {
-    // TODO args check
-    object_t *iterator = g_array_index(args, object_t*, 0);
+object_t *listiterator_next(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("No arguments");
+        return NULL;
+    }
+    object_t *iterator = args[0];
     object_t **objectp = iterator->listiterator_props->objectp;
     if (*objectp != NULL)
         iterator->listiterator_props->objectp++;;
     return *objectp;
 }
 
-object_t *list_iter(GArray *args) {
+object_t *list_iter(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("No arguments");
+        return NULL;
+    }
     printd("__iter__ creating list iterator from list\n");
-    object_t *list = g_array_index(args, object_t*, 0);
+    object_t *list = args[0];
     return new_listiterator_internal(list);
 }
 
-object_t *list_append(GArray *args) {
-    // TODO args check
-    object_t *list = g_array_index(args, object_t*, 0);
-    object_t *item = g_array_index(args, object_t*, 1);
+object_t *list_append(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("needs two arguments");
+        return NULL;
+    }
+    object_t *list = args[0];
+    object_t *item = args[1];
     g_array_append_val(list->list_props->ob_aval, item);
     return new_none_internal();
 }
 
-object_t *list_insert(GArray *args) {
-    object_t *list = g_array_index(args, object_t*, 0);
-    object_t *index = g_array_index(args, object_t*, 1);
-    object_t *item = g_array_index(args, object_t*, 2);
+object_t *list_insert(object_t **args) {
+    object_t *list = args[0];
+    object_t *index = args[1];
+    object_t *item = args[2];
+    if (args_len(args) != 3) {
+        set_exception("needs three arguments");
+        return NULL;
+    }
     if (index->type != INT_TYPE) {
         set_exception("Second type is not int");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     int i = index->int_props->ob_ival;
@@ -53,14 +66,17 @@ object_t *list_insert(GArray *args) {
     return new_none_internal();
 }
 
-object_t *list_extend(GArray *args) {
-    object_t *list = g_array_index(args, object_t*, 0);
-    object_t *list2 = g_array_index(args, object_t*, 1);
+object_t *list_extend(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("needs two arguments");
+        return NULL;
+    }
+    object_t *list = args[0];
+    object_t *list2 = args[1];
     GArray *list2_ob_aval = list2->list_props->ob_aval;
     GArray *list_ob_aval = list->list_props->ob_aval;
     if (list2->type != LIST_TYPE) {
         set_exception("Second type is not list");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     for (int i=0; g_array_index(list2_ob_aval, object_t*, i) != NULL; i++)
@@ -68,8 +84,12 @@ object_t *list_extend(GArray *args) {
     return new_none_internal();
 }
 
-object_t *list_reverse(GArray *args) {
-    object_t *list = g_array_index(args, object_t*, 0);
+object_t *list_reverse(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("needs one argument");
+        return NULL;
+    }
+    object_t *list = args[0];
     GArray *list_ob_aval = list->list_props->ob_aval;
     object_t **plast; object_t **p;
     for (p=get_garray_begin(list_ob_aval), plast=get_garray_end(list_ob_aval); *p != *plast; p++, plast--) {
@@ -80,14 +100,17 @@ object_t *list_reverse(GArray *args) {
     return new_none_internal();
 }
 
-object_t *list_add(GArray *args) {
-    object_t *list = g_array_index(args, object_t*, 0);
-    object_t *list2 = g_array_index(args, object_t*, 1);
+object_t *list_add(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("needs two arguments");
+        return NULL;
+    }
+    object_t *list = args[0];
+    object_t *list2 = args[1];
     object_t *list3 = new_list_internal();
     assert(list->type == LIST_TYPE);
     if (list2->type != LIST_TYPE) {
         set_exception("Second type is not list");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     object_t **list_iter = get_garray_begin(list->list_props->ob_aval);
@@ -100,13 +123,16 @@ object_t *list_add(GArray *args) {
     return list3;
 }
 
-object_t *list_pop(GArray *args) {
-    object_t *self = g_array_index(args, object_t*, 0);
+object_t *list_pop(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("needs an argument");
+        return NULL;
+    }
+    object_t *self = args[0];
     GArray *self_ob_aval = self->list_props->ob_aval;
 // Throw IndexError
     if (self_ob_aval->len == 0) {
         set_exception("IndexError");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     object_t *last = g_array_index(self_ob_aval, object_t*, self_ob_aval->len-1);
@@ -120,7 +146,6 @@ object_t *list_append_internal(object_t *list, object_t *item) {
 }
 
 object_t *new_listiterator_internal(object_t *list) {
-    // TODO args check
     printd("creating list iterator\n");
     object_t *listiterator = new_object(LISTITERATOR_TYPE);
     listiterator->listiterator_props = malloc(sizeof(struct listiterator_type));
@@ -131,20 +156,20 @@ object_t *new_listiterator_internal(object_t *list) {
     return listiterator;
 }
 
-object_t *list_setitem(GArray *args) {
-    // TODO
-    assert(args->len == 3);
-    object_t *self = g_array_index(args, object_t *, 0);
-    object_t *index = g_array_index(args, object_t *, 1);
-    object_t *item = g_array_index(args, object_t *, 2);
+object_t *list_setitem(object_t **args) {
+    if (args_len(args) != 3) {
+        set_exception("needs three argument");
+        return NULL;
+    }
+    object_t *self = args[0];
+    object_t *index = args[1];
+    object_t *item = args[2];
     if (index->type != INT_TYPE) {
         set_exception("Type should be int\n");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     if (index->int_props->ob_ival >= self->list_props->ob_aval->len) {
         set_exception("index bigger than list size\n");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     int len = self->list_props->ob_aval->len;
@@ -153,7 +178,6 @@ object_t *list_setitem(GArray *args) {
         i = len + i;
         if (i < 0) {
             set_exception("index out of range\n");
-            interpreter.error = RUN_ERROR;
             return NULL;
         }
     }
@@ -162,11 +186,13 @@ object_t *list_setitem(GArray *args) {
     return new_none_internal();
 }
 
-object_t *list_getitem(GArray *args) {
-    // TODO
-    assert(args->len == 2);
-    object_t *list = g_array_index(args, object_t *, 0);
-    object_t *slice = g_array_index(args, object_t *, 1);
+object_t *list_getitem(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("needs two arguments");
+        return NULL;
+    }
+    object_t *list = args[0];
+    object_t *slice = args[1];
     if (slice->type == INT_TYPE) {
         int i = slice->int_props->ob_ival;
         int len = list->list_props->ob_aval->len;
@@ -175,14 +201,12 @@ object_t *list_getitem(GArray *args) {
         }
         if (i < 0 || i >= len) {
             set_exception("index out of range\n");
-            interpreter.error = RUN_ERROR;
             return NULL;
         }
         return g_array_index(list->list_props->ob_aval, object_t *, i);
     }
     if (slice->type != SLICE_TYPE) {
         set_exception("Type should be int or slice\n");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     if (list->list_props->ob_aval->len == 0)
@@ -219,8 +243,12 @@ object_t *new_list_internal() {
     return list;
 }
 
-object_t *list_repr(GArray *args) {
-    object_t *self = g_array_index(args, object_t *, 0);
+object_t *list_repr(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("needs an argument");
+        return NULL;
+    }
+    object_t *self = args[0];
     char *str = NULL;
     char *cursor = NULL;
     cursor = fay_strcat(&str, "[", cursor);
@@ -236,12 +264,11 @@ object_t *list_repr(GArray *args) {
     return repr;
 }
 
-object_t *new_list(GArray *args) {
-    // TODO args check
+object_t *new_list(object_t **args) {
     object_t *list;
     // TODO this should iterate and copy list
-    if (args != NULL && args->len == 1)
-        list = g_array_index(args, object_t*, 0);
+    if (args != NULL && args[0] != NULL)
+        list = args[0];
     else
         list = new_list_internal();
     return list;

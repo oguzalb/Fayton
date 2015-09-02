@@ -57,7 +57,7 @@ struct thread_type {
 };
 
 struct func_type {
-    struct _object *(*ob_func)(GArray *);
+    struct _object *(*ob_func)(struct _object **);
     char *name;
 };
 
@@ -80,7 +80,7 @@ struct generatorfunc_type {
 struct class_type {
 // TODO CHAIN
     struct _object *inherits;
-    struct _object *(*ob_func)(GArray *);
+    struct _object *(*ob_func)(struct _object **);
     char *name;
 };
 
@@ -129,17 +129,18 @@ struct _interpreter {
 } interpreter;
 
 void print_var_each(gpointer, gpointer, gpointer);
-object_t *interpret_block(atom_t *, GHashTable *, int);
-object_t *interpret_funcblock(atom_t *, GHashTable *, int);
+object_t *interpret_block(atom_t *, object_t **, int);
+object_t *interpret_funcblock(atom_t *, object_t **, int);
 void init_interpreter();
-object_t *new_func(object_t *(*)(GArray *), char *);
+object_t *new_func(object_t *(*)(object_t **), char *);
 void register_global(char*, object_t *);
 object_t *get_global(char*);
 object_t *get_global_no_check(char*);
 object_t *new_class(char*);
+int args_len(object_t **args);
 void print_var(char*, object_t*);
 #define set_exception(fmt, args...) \
-    {char *msg; struct py_thread *mt = get_thread(); asprintf(&msg, fmt, ##args); mt->exc_msg = msg;}
+    {char *msg; interpreter.error = RUN_ERROR; struct py_thread *mt = get_thread(); asprintf(&msg, fmt, ##args); mt->exc_msg = msg;}
 
 struct py_thread *get_thread();
 struct py_thread *new_thread_struct();

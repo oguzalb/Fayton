@@ -1,38 +1,57 @@
 #include "str.h"
 
-object_t *new_str(GArray *args) {
+object_t *new_str(object_t **args) {
     printd("NEW STR\n");
-    object_t *str_obj = g_array_index(args, object_t *, 1);
+    if (args_len(args) != 2) {
+        set_exception("Needs two string arguments\n");
+        return NULL;
+    }
+    object_t *str_obj = args[1];
     if (str_obj->type != STR_TYPE) {
-        interpreter.error = RUN_ERROR;
+        set_exception("Parameter should be str\n");
         return NULL;
     }
     return str_obj;
 }
 
-object_t *str_repr(GArray *args) {
-    object_t *self = g_array_index(args, object_t *, 0);
+object_t *str_repr(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("Needs string argument\n");
+        return NULL;
+    }
+    object_t *self = args[0];
     char *str;
     asprintf(&str, "\"%s\"", self->str_props->ob_sval->str);
     return new_str_internal(str);
 }
 
-object_t *str_cmp(GArray *args) {
-    object_t *self = g_array_index(args, object_t *, 0);
-    object_t *other = g_array_index(args, object_t *, 1);
+object_t *str_cmp(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("Needs two string arguments\n");
+        return NULL;
+    }
+    object_t *self = args[0];
+    object_t *other = args[1];
     return new_int_internal(strcmp(self->str_props->ob_sval->str, other->str_props->ob_sval->str));
 }
  
-object_t *str_hash(GArray *args) {
-    object_t *self = g_array_index(args, object_t *, 0);
+object_t *str_hash(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("Needs a string argument\n");
+        return NULL;
+    }
+    object_t *self = args[0];
     return new_int_internal(g_str_hash(self->str_props->ob_sval->str));
 }
 
-object_t *str_getitem(GArray *args) {
+object_t *str_getitem(object_t **args) {
     // TODO
-    assert(args->len == 2);
-    object_t *str = g_array_index(args, object_t *, 0);
-    object_t *slice = g_array_index(args, object_t *, 1);
+    if (args_len(args) != 2) {
+        set_exception("Needs two arguments\n");
+        return NULL;
+    }
+    object_t *str = args[0];
+    object_t *slice = args[1];
     if (slice->type == INT_TYPE) {
         int i = slice->int_props->ob_ival;
         int len = str->str_props->ob_sval->len;
@@ -41,7 +60,6 @@ object_t *str_getitem(GArray *args) {
         }
         if (i < 0 || i >= len) {
             set_exception("index out of range\n");
-            interpreter.error = RUN_ERROR;
             return NULL;
         }
         char buff[2];
@@ -53,7 +71,6 @@ object_t *str_getitem(GArray *args) {
         return new_str_internal(NULL);
     if (slice->type != SLICE_TYPE) {
         set_exception("Type should be int or slice\n");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     printd("Creating slice string\n");

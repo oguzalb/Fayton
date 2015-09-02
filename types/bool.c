@@ -27,21 +27,28 @@ object_t *new_bool_internal(object_t *object) {
     } else {
 // TODO implement non_zeros
         set_exception("NOT boolABLE ( : %s\n", object_type_name(object->type));
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
 }
 
-object_t* new_bool(GArray *args) {
-    object_t *object = g_array_index(args, object_t*, 1);
-printf("ASHDASD %s\n", object_type_name(object->type));
+object_t* new_bool(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("one argument expected\n");
+        return NULL;
+    }
+    object_t *object = args[1];
     return new_bool_internal(object);
 }
 
-object_t *bool_repr_func(GArray *args) {
+object_t *bool_repr_func(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("one argument expected\n");
+        return NULL;
+    }
     static object_t *true_repr = NULL;
     static object_t *false_repr = NULL;
-    object_t *self = g_array_index(args, object_t *, 0);
+    object_t *self = args[0];
+    assert(args[1] == NULL);
     if (self->bool_props->ob_bval == TRUE) {
         if (true_repr != NULL)
             return true_repr;

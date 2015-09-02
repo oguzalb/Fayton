@@ -1,13 +1,16 @@
 #include "slice.h"
 
-object_t *new_slice(GArray *args) {
+object_t *new_slice(object_t **args) {
     printd("NEW SLICE\n");
-    object_t *start = g_array_index(args, object_t *, 1);
-    object_t *stop = g_array_index(args, object_t *, 2);
-    object_t *step = g_array_index(args, object_t *, 3);
+    if (args_len(args) != 4) {
+        set_exception("4 arguments expected\n");
+        return NULL;
+    }
+    object_t *start = args[1];
+    object_t *stop = args[2];
+    object_t *step = args[3];
     if ((start->type != INT_TYPE && start->type != NONE_TYPE) || (stop->type != INT_TYPE && stop->type != NONE_TYPE) || (step->type != INT_TYPE && step->type != NONE_TYPE)) {
-        printd("NOT INT\n");
-        interpreter.error = RUN_ERROR;
+        set_exception("NOT INT\n");
         return NULL;
     }
     return new_slice_internal(
@@ -46,7 +49,6 @@ void set_indices(object_t* slice, int last_index, int* start, int* stop, int* st
     }
     if (*step == 0) {
         set_exception("Step can not be 0\n");
-        interpreter.error = RUN_ERROR;
         return;
     }
     if (*start < 0)

@@ -1,92 +1,118 @@
 #include "int.h"
 
-object_t *int_sub(GArray *args) {
-    assert(args->len == 2);
-    object_t *left = g_array_index(args, object_t*, 0);
-    object_t *right = g_array_index(args, object_t*, 1);
+object_t *int_sub(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("Needs two integer arguments\n");
+        return NULL;
+    }
+    object_t *left = args[0];
+    object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        interpreter.error = RUN_ERROR;
+        set_exception("Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival - right->int_props->ob_ival);
 }
 
-object_t *int_add(GArray *args) {
-    assert(args->len == 2);
-    object_t *left = g_array_index(args, object_t*, 0);
-    object_t *right = g_array_index(args, object_t*, 1);
+object_t *int_add(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("Needs two integer arguments\n");
+    }
+    object_t *left = args[0];
+    object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        interpreter.error = RUN_ERROR;
+        set_exception("Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival + right->int_props->ob_ival);
 }
 
-object_t *int_mul(GArray *args) {
-    assert(args->len == 2);
-    object_t *left = g_array_index(args, object_t*, 0);
-    object_t *right = g_array_index(args, object_t*, 1);
+object_t *int_mul(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("Needs two integer arguments\n");
+        return NULL;
+    }
+    object_t *left = args[0];
+    object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        interpreter.error = RUN_ERROR;
+        set_exception("Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival * right->int_props->ob_ival);
 }
 
-object_t *int_div(GArray *args) {
-    assert(args->len == 2);
-    object_t *left = g_array_index(args, object_t*, 0);
-    object_t *right = g_array_index(args, object_t*, 1);
+object_t *int_div(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("Needs two integer arguments\n");
+        return NULL;
+    }
+    object_t *left = args[0];
+    object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        interpreter.error = RUN_ERROR;
+        set_exception("Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival / right->int_props->ob_ival);
 }
 
-object_t *int_cmp(GArray *args) {
-    assert(args->len == 2);
-    object_t *left = g_array_index(args, object_t*, 0);
-    object_t *right = g_array_index(args, object_t*, 1);
+object_t *int_cmp(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("Needs two integer arguments\n");
+        return NULL;
+    }
+    object_t *left = args[0];
+    object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        interpreter.error = RUN_ERROR;
-        printd("NOT INT\n");
+        set_exception("Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival > right->int_props->ob_ival? 1:left->int_props->ob_ival == right->int_props->ob_ival?0:-1);
 }
 
-object_t *int_equals(GArray *args) {
-    assert(args->len == 2);
-    object_t *left = g_array_index(args, object_t*, 0);
-    object_t *right = g_array_index(args, object_t*, 1);
+object_t *int_equals(object_t **args) {
+    if (args_len(args) != 2) {
+        set_exception("Needs two integer arguments\n");
+        return NULL;
+    }
+    object_t *left = args[0];
+    object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        interpreter.error = RUN_ERROR;
-        printd("NOT INT\n");
+        set_exception("Both parameters should be integer\n");
         return NULL;
     }
     return new_bool_from_int(left->int_props->ob_ival == right->int_props->ob_ival);
 }
 
-object_t *int_hash(GArray *args) {
-    object_t *self = g_array_index(args, object_t *, 0);
+object_t *int_hash(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("Needs two integer arguments\n");
+        return NULL;
+    }
+    object_t *self = args[0];
     return new_int_internal(g_int_hash(&self->int_props->ob_ival));
 }
 
-object_t *int_repr(GArray *args) {
-    object_t *self = g_array_index(args, object_t *, 0);
+object_t *int_repr(object_t **args) {
+    if (args_len(args) != 1) {
+        set_exception("Needs an integer argument\n");
+        return NULL;
+    }
+    object_t *self = args[0];
     char *str;
     asprintf(&str, "%d", self->int_props->ob_ival);
     object_t *repr = new_str_internal(str);
     return repr;
 }
 
-object_t *new_int(GArray *args) {
+object_t *new_int(object_t **args) {
     printd("NEW INT\n");
-    object_t *int_obj = g_array_index(args, object_t *, 1);
+    if (args_len(args) != 2) {
+        set_exception("Needs two integer arguments\n");
+        return NULL;
+    }
+    object_t *int_obj = args[1];
     if (int_obj->type != INT_TYPE) {
-        printd("NOT INT\n");
-        interpreter.error = RUN_ERROR;
+        set_exception("Parameter should be integer\n");
         return NULL;
     }
     return int_obj;

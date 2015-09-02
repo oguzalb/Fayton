@@ -24,7 +24,7 @@ char *object_type_name(int type) {
     assert(FALSE);
 }
 
-#define FUNC_STRUCT_TYPE(x) object_t *(*x)(GArray *)
+#define FUNC_STRUCT_TYPE(x) object_t *(*x)(object_t **)
 
 struct py_thread * get_thread() {
     int *index = pthread_getspecific(py_thread_key);
@@ -48,6 +48,12 @@ void print_var_each(gpointer name, gpointer obj, gpointer user_data) {
 void print_pair_each(gpointer key, gpointer value, gpointer user_data) {
     print_var("key", (object_t*) key);
     print_var("value", (object_t*) value);
+}
+
+int args_len(object_t **args) {
+    int count = 0;
+    while (*args != NULL) {args++; count++;}
+    return count;
 }
 
 void print_var(char* name, object_t* obj) {
@@ -74,7 +80,6 @@ object_t *new_class(char* name) {
     object_t *cls = g_hash_table_lookup(interpreter.globals, name);
     if (cls != NULL) {
         printd("This class already exists\n");
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     printd("Creating the class %s\n", name);
@@ -94,18 +99,17 @@ void register_builtin_func(char* name, object_t *object) {
     g_hash_table_insert(interpreter.globals, name, object);
 }
 
-object_t *lookup_var(GArray *args, atom_t *var) {
+object_t *lookup_var(object_t **args, atom_t *var) {
     object_t *obj;
     printd("lookup var cl_index %d\n", var->cl_index);
     if (var->cl_index == -1) {
         obj = g_hash_table_lookup(interpreter.globals, var->value);
         printd("var search from globals\n");
-    } else if (var->cl_index < args->len){
-        obj = g_array_index(args, object_t *, var->cl_index);
+    } else if (var->cl_index < args_len(args)){
+        obj = args[var->cl_index];
         printd("var search from locals\n");
     }
     if (obj == NULL) {
-        interpreter.error = RUN_ERROR;
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
         set_exception(var->cl_index == -1 ?"Global not found |%s|\n":"Local not found!!!|%s|\n", var->value);
         return NULL;
@@ -113,35 +117,31 @@ object_t *lookup_var(GArray *args, atom_t *var) {
     return obj;
 }
 
-object_t *set_var(GArray *args, atom_t *var, object_t* value) {
+object_t *set_var(object_t **args, atom_t *var, object_t* value) {
     object_t *obj;
     printd("set_var cl_index: %d\n", var->cl_index);
     if (var->cl_index == -1) {
         g_hash_table_insert(interpreter.globals, var->value, value);
     } else {
-        if (args->len == var->cl_index)
-            g_array_append_val(args, value);
-        else if (var->cl_index >= 0) {
-            g_array_set(args, value, var->cl_index);
-        } else
-            assert(FALSE);
+// maybe a length check
+        args[var->cl_index] = value;
     }
 }
 object_t *get_global(char*name) {
     object_t *cls = g_hash_table_lookup(interpreter.globals, name);
     if (cls == NULL) {
-        interpreter.error = RUN_ERROR;
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
         set_exception("Global not found |%s|\n", name);
         return NULL;
     }
     return cls;
 }
+
 object_t *get_global_no_check(char*name) {
     return g_hash_table_lookup(interpreter.globals, name);
 }
 
-object_t *new_func(object_t *(*func)(GArray *), char *name) {
+object_t *new_func(object_t *(*func)(object_t **), char *name) {
     object_t *func_obj = new_object(FUNC_TYPE);
     func_obj->func_props = malloc(sizeof(struct func_type));
     func_obj->func_props->ob_func = func;
@@ -169,39 +169,19 @@ object_t *new_generator_func(atom_t *func, char* name) {
     return func_obj;
 }
 
-object_t *interpret_funcblock(atom_t *, GHashTable *, int);
-object_t *sum_func(GArray *args) {
-    object_t *iterable = g_array_index(args, object_t*, 0);
-    object_t *iter_func = object_get_field(iterable, "__iter__");
+object_t *sum_func(object_t **args) {
+    object_t *iterable = args[0];
+    object_t *iterator = object_call_func_no_param(iterable, "__iter__");
     if (interpreter.error == RUN_ERROR)
         return NULL;
-    object_t *iterator;
-    if (iter_func->type == USERFUNC_TYPE) {
-        GHashTable *sub_context = g_hash_table_new(g_str_hash, g_str_equal);
-        atom_t *param_name = iter_func->userfunc_props->ob_userfunc->child->child;
-        g_hash_table_insert(sub_context, param_name->value, iterable);
-        iterator = interpret_funcblock(iter_func->userfunc_props->ob_userfunc->child->next, sub_context, /* TODO */0);
-    } else {
-        GArray *args = g_array_new(TRUE, TRUE, sizeof(object_t *));
-        g_array_append_val(args, iterable);
-        iterator = iter_func->func_props->ob_func(args);
-    }
     object_t *next_func = object_get_field(iterator, "next");
     if (interpreter.error == RUN_ERROR)
         return NULL;
-    object_t *int_obj = NULL;
     int sum = 0;
+    object_t *int_obj = NULL;
+    object_t *next_params[2] = {iterator, NULL};
     do {
-        if (next_func->type == USERFUNC_TYPE) {
-            GHashTable *sub_context = g_hash_table_new(g_str_hash, g_str_equal);
-            atom_t *param_name = next_func->userfunc_props->ob_userfunc->child->child;
-            g_hash_table_insert(sub_context, param_name->value, iterator);
-            int_obj = interpret_funcblock(next_func->userfunc_props->ob_userfunc->child->next, sub_context, /* TODO */ 0);
-        } else {
-            GArray *args = g_array_new(TRUE, TRUE, sizeof(object_t *));
-            g_array_append_val(args, iterator);
-            int_obj = next_func->func_props->ob_func(args);
-        }
+        int_obj = object_call_func_obj(next_func, next_params);
         assert(int_obj != NULL?int_obj->type == INT_TYPE:TRUE);
         // TODO __add__
         if (int_obj != NULL)
@@ -213,11 +193,12 @@ object_t *sum_func(GArray *args) {
     return result;
 }
 
-object_t *range_func(GArray *args) {
-    object_t *min = g_array_index(args, object_t*, 0);
-    object_t *max = g_array_index(args, object_t*, 1);
+object_t *range_func(object_t **args) {
+    object_t *min = args[0];
+    object_t *max = args[1];
+    assert(args[2] == NULL);
     if (min->type != INT_TYPE || min->type != INT_TYPE) {
-        interpreter.error = RUN_ERROR;
+        set_exception("Range parameters should be integer\n");
         return NULL;
     }
     object_t *list = new_list(NULL);
@@ -228,8 +209,9 @@ object_t *range_func(GArray *args) {
     return list;
 }
 
-object_t *print_func(GArray *args) {
-    object_t *obj = g_array_index(args, object_t*, 0);
+object_t *print_func(object_t **args) {
+    object_t *obj = args[0];
+    assert(args[1] == NULL);
     object_t *obj_str = object_call_str(obj);
     if (interpreter.error == RUN_ERROR)
         return NULL;
@@ -286,8 +268,8 @@ void init_interpreter() {
     register_global(strdup("print"), new_func(print_func, strdup("print")));
 }
 
-object_t *interpret_expr(atom_t *, GArray *, int);
-object_t *interpret_funccall(atom_t *func_call, GArray *args, int current_indent) {
+object_t *interpret_expr(atom_t *,object_t **, int);
+object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_indent) {
     object_t *func = interpret_expr(func_call->child, args, current_indent);
     if (interpreter.error == RUN_ERROR)
         return NULL;
@@ -295,112 +277,124 @@ object_t *interpret_funccall(atom_t *func_call, GArray *args, int current_indent
         print_var("last", interpreter.last_accessed);
     if (func == NULL) {
         set_exception("function not found |%s|\n", func_call->value);
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     if (func->type != FUNC_TYPE && func->type != USERFUNC_TYPE && func->type != CLASS_TYPE && func->type != GENERATORFUNC_TYPE) {
         set_exception("OBJ IS NOT CALLABLE %s\n", object_type_name(func->type));
-        interpreter.error = RUN_ERROR;
         return NULL;
     }
     printd("FUNC FOUND |%s|\n", func_call->value);
-    
-    GArray *inner_args;
-    if (func->type == FUNC_TYPE || func->type == CLASS_TYPE || func->type == USERFUNC_TYPE || func->type == GENERATORFUNC_TYPE) {
-        inner_args = g_array_new(TRUE, TRUE, sizeof(object_t *));
+    int inner_arg_count = 0;
+    if (func->type == USERFUNC_TYPE) {
+        inner_arg_count = g_hash_table_size(func->userfunc_props->ob_userfunc->context)+1;
+    } else if (func->type == GENERATORFUNC_TYPE) {
+        inner_arg_count = g_hash_table_size(func->generatorfunc_props->ob_generatorfunc->context)+1;
+    } else {
+// builtins
+// TODO should be calculated once
         atom_t *param = func_call->child->next->child;
-        if (func->type == CLASS_TYPE) {
-            print_var("adding param class", func);
-            g_array_append_val(inner_args, func);
-        } else if (func_call->child->type == A_ACCESSOR && interpreter.last_accessed != NULL) {
-            print_var("adding param", interpreter.last_accessed);
-            g_array_append_val(inner_args, interpreter.last_accessed);
+        while (param) {
+            inner_arg_count++;
+            param = param->next;
         }
-        if (func->type == FUNC_TYPE || func->type == CLASS_TYPE) {
-            while (param) {
+    }
+    atom_t *param = func_call->child->next->child;
+    object_t *self = NULL;
+    printd("deciding instance param\n");
+    if (func->type == CLASS_TYPE) {
+        print_var("adding param class", func);
+        self = func;
+    } else if (func_call->child->type == A_ACCESSOR && interpreter.last_accessed != NULL) {
+        print_var("adding param", interpreter.last_accessed);
+        self = interpreter.last_accessed;
+    }
+    if (self != NULL)
+        inner_arg_count++;
+    object_t *inner_args[inner_arg_count];
+    inner_args[inner_arg_count] = NULL;
+    int param_index = 0;
+    if (self != NULL)
+        inner_args[param_index++] = self;
+    if (func->type == FUNC_TYPE || func->type == CLASS_TYPE) {
+        while (param) {
 // TODO kwargs should be supported for builtins
-                object_t *value = interpret_expr(param, args, current_indent);
-                if (interpreter.error == RUN_ERROR) {
-                    return NULL;
-                }
-                printd("ADDING ARGUMENT %s\n", param->value);
-                print_var("", value);
-                g_array_append_val(inner_args, value);
-                param = param->next;
-            }
-        } else {
-            atom_t *param_name = func->userfunc_props->ob_userfunc->child->child;
-            if (func_call->child->type == A_ACCESSOR && interpreter.last_accessed != NULL)
-                param_name = param_name->next;
-            while (param && param_name && param_name->type == A_VAR) {
-                object_t *value = interpret_expr(param, args, current_indent);
-                if (interpreter.error == RUN_ERROR) {
-                    return NULL;
-                }
-                printd("ADDING ARGUMENT %s\n", param->value);
-                print_var("", value);
-                g_array_append_val(inner_args, value);
-                param = param->next;
-                param_name = param_name->next;
-            }
-            GHashTable *inner_kwargs = g_hash_table_new(g_str_hash, g_str_equal);
-            atom_t *kwarg_name = param_name;
-            // kwargs without names
-            while (param && (param->type != A_VAR || param->child == NULL) && param_name && param_name->type == A_KWARG) {
-                printd("adding kwarg %s\n", param_name->value);
-                object_t *value = interpret_expr(param, args, current_indent);
-                if (interpreter.error == RUN_ERROR) {
-                    return NULL;
-                }
-                g_hash_table_insert(inner_kwargs, param_name->value, value);
-                param_name = param_name->next;
-                param = param->next;
-            }
-            // kwargs with names
-            while (param) {
-                assert(param->child != NULL);
-                printd("adding named kwarg %s\n", param->value);
-                object_t *value = interpret_expr(param->child, args, current_indent);
-                if (interpreter.error == RUN_ERROR) {
-                    return NULL;
-                }
-                g_hash_table_insert(inner_kwargs, param->value, value);
-                param = param->next;
-            }
-            while (kwarg_name && kwarg_name->type == A_KWARG) {
-                object_t *value = g_hash_table_lookup(inner_kwargs, kwarg_name->value);
-                if (value == NULL)
-                    value = g_hash_table_lookup(func->userfunc_props->kwargs, kwarg_name->value);
-                assert(value != NULL);
-                g_array_append_val(inner_args, value);
-                kwarg_name = kwarg_name->next;
-            }
-            g_hash_table_destroy(inner_kwargs);
-            if (param != NULL) {
-                printd("param type %s\n", object_type_name(param->type));
-                set_exception("Too many params to %s\n", func->userfunc_props->name);
-                interpreter.error = RUN_ERROR;
-                return NULL;
-            } else if (param_name != NULL && param_name->type == A_VAR) {
-                printd("param_name %s\n", param_name->value);
-                set_exception("More params needed for %s\n", func->userfunc_props->name);
-                interpreter.error = RUN_ERROR;
+            object_t *value = interpret_expr(param, args, current_indent);
+            if (interpreter.error == RUN_ERROR) {
                 return NULL;
             }
-            while (param_name && param_name->type == A_KWARG) param_name = param_name->next;
-            atom_t *closure_name = param_name;
-            while (closure_name) {
-                printd("cl_index: %d args_len: %d %s\n", closure_name->cl_index, args->len, atom_type_name(closure_name->type));
-                assert(closure_name->cl_index < args->len);
-                object_t *arg = g_array_index(args, object_t*, closure_name->cl_index);
-                g_array_append_val(inner_args, arg);
-                closure_name = closure_name->next;
-            }
+            printd("ADDING ARGUMENT %s\n", param->value);
+            print_var("", value);
+            inner_args[param_index++] = value;
+            param = param->next;
         }
-        
+    } else {
+        atom_t *param_name = func->userfunc_props->ob_userfunc->child->child;
+        if (func_call->child->type == A_ACCESSOR && interpreter.last_accessed != NULL)
+            param_name = param_name->next;
+        while (param && param_name && param_name->type == A_VAR) {
+            object_t *value = interpret_expr(param, args, current_indent);
+            if (interpreter.error == RUN_ERROR) {
+                return NULL;
+            }
+            printd("ADDING ARGUMENT %s\n", param->value);
+            print_var("", value);
+            inner_args[param_index++] = value;
+            param = param->next;
+            param_name = param_name->next;
+        }
+        GHashTable *inner_kwargs = g_hash_table_new(g_str_hash, g_str_equal);
+        atom_t *kwarg_name = param_name;
+        // kwargs without names
+        while (param && (param->type != A_VAR || param->child == NULL) && param_name && param_name->type == A_KWARG) {
+            printd("adding kwarg %s\n", param_name->value);
+            object_t *value = interpret_expr(param, args, current_indent);
+            if (interpreter.error == RUN_ERROR) {
+                return NULL;
+            }
+            g_hash_table_insert(inner_kwargs, param_name->value, value);
+            param_name = param_name->next;
+            param = param->next;
+        }
+        // kwargs with names
+        while (param) {
+            assert(param->child != NULL);
+            printd("adding named kwarg %s\n", param->value);
+            object_t *value = interpret_expr(param->child, args, current_indent);
+            if (interpreter.error == RUN_ERROR) {
+                return NULL;
+            }
+            g_hash_table_insert(inner_kwargs, param->value, value);
+            param = param->next;
+        }
+        while (kwarg_name && kwarg_name->type == A_KWARG) {
+            object_t *value = g_hash_table_lookup(inner_kwargs, kwarg_name->value);
+            if (value == NULL)
+                value = g_hash_table_lookup(func->userfunc_props->kwargs, kwarg_name->value);
+            assert(value != NULL);
+            inner_args[param_index++] = value;
+            kwarg_name = kwarg_name->next;
+        }
+        g_hash_table_destroy(inner_kwargs);
+        if (param != NULL) {
+            printd("param type %s\n", object_type_name(param->type));
+            set_exception("Too many params to %s\n", func->userfunc_props->name);
+            return NULL;
+        } else if (param_name != NULL && param_name->type == A_VAR) {
+            printd("param_name %s\n", param_name->value);
+            set_exception("More params needed for %s\n", func->userfunc_props->name);
+            return NULL;
+        }
+        while (param_name && param_name->type == A_KWARG) param_name = param_name->next;
+        atom_t *closure_name = param_name;
+        while (closure_name) {
+            printd("cl_index: %d args_len: %d %s\n", closure_name->cl_index, args_len(args), atom_type_name(closure_name->type));
+            assert(closure_name->cl_index < args_len(args));
+            object_t *arg = args[closure_name->cl_index];
+            inner_args[param_index++] = arg;
+            closure_name = closure_name->next;
+        }
+    }   
     printd("calling func type %s %s\n", object_type_name(func->type), func->func_props->name);
-    } else 
-        assert(FALSE);
     printd("ADDED PARAMS\n");
     struct py_thread *thread = get_thread();
     char* func_name;
@@ -429,12 +423,12 @@ object_t *interpret_funccall(atom_t *func_call, GArray *args, int current_indent
     return result;
 }
 
-object_t *interpret_list(atom_t *expr, GArray *args, int current_indent) {
+object_t *interpret_list(atom_t *expr, object_t **args, int current_indent) {
     object_t *list = new_list_internal();
     atom_t *elem = expr->child;
     while (elem != NULL) {
         object_t *result = interpret_expr(elem, args, current_indent);
-        if (interpreter.error) {
+        if (interpreter.error == RUN_ERROR) {
             return NULL;
         }
         list_append_internal(list, result);
@@ -443,16 +437,16 @@ object_t *interpret_list(atom_t *expr, GArray *args, int current_indent) {
     return list;
 }
 
-object_t *interpret_dict(atom_t *expr, GArray *args, int current_indent) {
+object_t *interpret_dict(atom_t *expr, object_t **args, int current_indent) {
     object_t *dict = new_dict(NULL);
     atom_t *elem = expr->child;
     while (elem != NULL) {
         object_t *key = interpret_expr(elem, args, current_indent);
-        if (interpreter.error) {
+        if (interpreter.error == RUN_ERROR) {
             return dict;
         }
         object_t *value = interpret_expr(elem->next, args, current_indent);
-        if (interpreter.error) {
+        if (interpreter.error == RUN_ERROR) {
             return dict;
         }
         g_hash_table_insert(dict->dict_props->ob_dval, key, value);
@@ -463,7 +457,7 @@ object_t *interpret_dict(atom_t *expr, GArray *args, int current_indent) {
     return dict;
 }
 
-object_t *interpret_while(atom_t *expr, GArray *args, int current_indent) {
+object_t *interpret_while(atom_t *expr, object_t **args, int current_indent) {
     atom_t *condition = expr->child;
     atom_t *block = expr->child->next;
 // TODO give it to bool
@@ -472,7 +466,6 @@ object_t *interpret_while(atom_t *expr, GArray *args, int current_indent) {
     while (bool_obj = interpret_expr(condition, args, current_indent)) {
         if (bool_obj->type != BOOL_TYPE) {
             set_exception("NOT A BOOL TYPE\n");
-            interpreter.error = RUN_ERROR;
             return NULL;
         }
         if (bool_obj->bool_props->ob_bval == FALSE)
@@ -484,7 +477,7 @@ object_t *interpret_while(atom_t *expr, GArray *args, int current_indent) {
     return NULL;
 }
 
-object_t *interpret_if(atom_t *expr, GArray *args, int current_indent) {
+object_t *interpret_if(atom_t *expr, object_t **args, int current_indent) {
     atom_t *if_block = expr->child;
     while (if_block) {
         if (if_block->type == A_BLOCK) {
@@ -500,7 +493,6 @@ object_t *interpret_if(atom_t *expr, GArray *args, int current_indent) {
                 return NULL;
             if (bool_obj->type != BOOL_TYPE) {
                 set_exception("NOT A BOOL TYPE\n");
-                interpreter.error = RUN_ERROR;
                 return NULL;
             }
             if_block = if_block->next;
@@ -514,7 +506,7 @@ object_t *interpret_if(atom_t *expr, GArray *args, int current_indent) {
     return NULL;
 }
 
-object_t *interpret_expr(atom_t *expr, GArray *args, int current_indent) {
+object_t *interpret_expr(atom_t *expr, object_t **args, int current_indent) {
 // TODO
     printd("FIRST_TYPE %s\n", atom_type_name(expr->type));
     if (expr->type == A_VAR) {
@@ -572,13 +564,12 @@ object_t *interpret_expr(atom_t *expr, GArray *args, int current_indent) {
             return NULL;
         return new_bool_from_int(!bool_obj->bool_props->ob_bval);
     } else {
-        interpreter.error = RUN_ERROR;
         set_exception("TYPE INCORRECT %s\n", atom_type_name(expr->type));
         return NULL;
     }
 }
 
-object_t *interpret_stmt(atom_t *stmt, GArray *args, int current_indent) {
+object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
     if (stmt->type == A_FUNCCALL) {
         interpret_expr(stmt, args, current_indent);
     } else if (stmt->type == A_ASSIGNMENT) {
@@ -589,7 +580,6 @@ object_t *interpret_stmt(atom_t *stmt, GArray *args, int current_indent) {
             return NULL;
         if (result == NULL) {
             printd("GOT NOTHING, can't assign\n");
-            interpreter.error = RUN_ERROR;
             return NULL;
         }
 
@@ -608,26 +598,21 @@ object_t *interpret_stmt(atom_t *stmt, GArray *args, int current_indent) {
         object_t *iterable = interpret_expr(expr, args, current_indent);
         if (interpreter.error == RUN_ERROR)
             return NULL;
-        object_t *iter_func = object_get_field(iterable, "__iter__");
+        printd("calling __iter__\n");
+        object_t *iterator = object_call_func_no_param(iterable, "__iter__");
         if (interpreter.error == RUN_ERROR)
             return NULL;
-        GArray *args = g_array_new(TRUE, TRUE, sizeof(object_t *));
-        g_array_append_val(args, iterable);
-        printd("calling __iter__\n");
-        object_t *iterator = iter_func->func_props->ob_func(args);
-        assert(iterator->class != NULL);
         printd("calling __iter__ END\n");
+        assert(iterator->class != NULL);
         atom_t *block = expr->next;
         object_t *next_func = object_get_field(iterator, "next");
         if (interpreter.error == RUN_ERROR)
             return NULL;
-        g_array_remove_index(args, 0);
-        g_array_append_val(args, iterator);
+        object_t *params[2] = {iterator, NULL};
         object_t *item;
-        while(item = next_func->func_props->ob_func(args)) {
+        while(item = object_call_func_obj(next_func, params)) {
             if (var_name->type == A_TUPLE) {
                 set_exception("tuples for for loop not implemented yet\n");
-                interpreter.error = RUN_ERROR;
                 return NULL;
             }
             set_var(args, var_name, item);
@@ -709,7 +694,6 @@ printd("A_WHILE\n");
         if (inherits != NULL) {
             object_t *parent_class = lookup_var(args, inherits);
             if (parent_class == NULL) {
-                interpreter.error = RUN_ERROR;
                 set_exception("Class does not exist: %s\n", inherits->value);
                 return NULL;
             }
@@ -739,17 +723,17 @@ printd("A_WHILE\n");
         g_mutex_unlock(mutex);
         printd("passed yield wait (gen thread)\n");
     } else {
-        interpreter.error = RUN_ERROR;
         set_exception("UNKNOWN ATOM %s\n", atom_type_name(stmt->type));
+        return NULL;
     }
     return NULL;
 }
 
-object_t *interpret_block(atom_t *block, GHashTable *context, int current_indent) {
+object_t *interpret_block(atom_t *block, object_t **args, int current_indent) {
+    // TODO WHY?
     interpreter.error = 0;
     printd("interpreting block\n");
     if (block->type != A_BLOCK) {
-        interpreter.error = RUN_ERROR;
         set_exception("NOT A BLOCK\n");
         return NULL;
     }
@@ -758,7 +742,7 @@ object_t *interpret_block(atom_t *block, GHashTable *context, int current_indent
         return new_none_internal();
     object_t *last_result;
     do {
-        object_t *ret = interpret_stmt(stmt, context, current_indent);
+        object_t *ret = interpret_stmt(stmt, args, current_indent);
         if (interpreter.error == RUN_ERROR)
             return NULL;
         if (ret != NULL)
@@ -766,8 +750,8 @@ object_t *interpret_block(atom_t *block, GHashTable *context, int current_indent
     } while (stmt = stmt->next);
     return NULL;
 }
-object_t *interpret_funcblock(atom_t *block, GHashTable *context, int current_indent) {
-    object_t *result = interpret_block(block, context, current_indent);
+object_t *interpret_funcblock(atom_t *block, object_t **args, int current_indent) {
+    object_t *result = interpret_block(block, args, current_indent);
     struct py_thread *thread = get_thread();
     if (thread->generator != NULL) {
         thread->generator_channel = NULL;
