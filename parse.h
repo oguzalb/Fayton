@@ -6,6 +6,7 @@
 #include <string.h>
 #include <assert.h>
 #include <glib.h>
+#include "utils.h"
 
 #ifdef DEBUG
 #define printd(fmt, args...) \
@@ -90,6 +91,7 @@ struct t_tokenizer {
     struct t_token** tokens;
     int current_line;
     int error;
+    int is_repl;
     GArray *func_contexts;
 };
 
@@ -98,7 +100,7 @@ atom_t *parse_block(struct t_tokenizer *, int);
 struct t_tokenizer *new_tokenizer();
 void free_tokenizer(struct t_tokenizer *tokenizer);
 void free_atom_tree(atom_t *atom);
-char* print_atom(atom_t *atom, char* buff, int indent, int test);
+void print_atom(atom_t *atom, char** dest, int indent, int test);
 char *atom_type_name(int type);
 
 #endif

@@ -18,19 +18,19 @@ void test_interpret_block(char *code, atom_tree_t *tree) {
     printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
-    struct t_tokenizer *tokenizer = new_tokenizer();
+    struct t_tokenizer *tokenizer = new_tokenizer(FALSE);
     int success = tokenize_stream(stream, tree, tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
     tree->root = parse_block(tokenizer, -1);
     assert(tokenizer->error != PARSE_ERROR);
     free_tokenizer(tokenizer);
-    char buff[2048];
-    buff[0] = '\0';
-    print_atom(tree->root, buff, 0, FALSE);
+    char *buff = NULL;
+    print_atom(tree->root, &buff, 0, FALSE);
     printf("%s\n", buff);
     printd("initializing interpreter\n", buff);
+    free(buff);
     init_interpreter();
-    printd("interpreting\n", buff);
+    printd("interpreting\n");
     interpret_block(tree->root, NULL, 0);
     if (interpreter.error == RUN_ERROR) {
         struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
@@ -46,19 +46,19 @@ void test_interpret_block_fail(char *code, atom_tree_t *tree) {
     printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
-    struct t_tokenizer *tokenizer = new_tokenizer();
+    struct t_tokenizer *tokenizer = new_tokenizer(FALSE);
     int success = tokenize_stream(stream, tree, tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
     tree->root = parse_block(tokenizer, -1);
     assert(tokenizer->error != PARSE_ERROR);
     free_tokenizer(tokenizer);
-    char buff[2048];
-    buff[0] = '\0';
-    print_atom(tree->root, buff, 0, FALSE);
+    char *buff = NULL;
+    print_atom(tree->root, &buff, 0, FALSE);
     printf("%s\n", buff);
-    printd("initializing interpreter\n", buff);
+    printd("initializing interpreter\n");
+    free(buff);
     init_interpreter();
-    printd("interpreting\n", buff);
+    printd("interpreting\n");
     interpret_block(tree->root, NULL, 0);
     assert(interpreter.error == RUN_ERROR);
     struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
@@ -172,6 +172,18 @@ print(func(1))\n", &tree);
 "for i,j in [[1,2], [3,4]]:\n\
     print(i)\n\
     print(j)\n", &tree);
+    test_interpret_block(
+"class A():\n\
+    def func(self):\n\
+        print 1\n\
+class B():\n\
+    def func(self):\n\
+        print 2\n\
+class C(B, A):\n\
+        def somefunc(self):\n\
+            print 3\n\
+c = C()\n\
+c.func()", &tree);
     return 0;
 }
 

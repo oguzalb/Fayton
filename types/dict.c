@@ -115,7 +115,7 @@ object_t *new_dict(object_t **args) {
 }
 
 void init_dict() {
-    object_t *dict_class = new_class(strdup("dict"));
+    object_t *dict_class = new_class(strdup("dict"), NULL);
     dict_class->class_props->ob_func = new_dict;
     //object_add_field(dict_class, "__iter__", new_func(iter_dict_func));
     object_add_field(dict_class, "keys", new_func(dict_keys, strdup("keys")));

@@ -22,72 +22,71 @@ void test_parse_func_basic(char* code, char *expect, atom_tree_t *tree, atom_t *
     printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
-    struct t_tokenizer *tokenizer = new_tokenizer();
+    struct t_tokenizer *tokenizer = new_tokenizer(FALSE);
     int success = tokenize_stream(stream, tree, tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
     tree->root = func(tokenizer);
 printf("PARSE FINISHED\n");
     assert(tokenizer->error != PARSE_ERROR);
     free_tokenizer(tokenizer);
-    char buff[1024];
-    buff[0] = '\0';
-    print_atom(tree->root, buff, 0, FALSE);
+    char *buff = NULL;
+    print_atom(tree->root, &buff, 0, FALSE);
     free_atom_tree(tree->root);
     printf("%s\n", buff);
     assert(!strcmp(buff, expect));
+    free(buff);
 
 }
 void test_parse_func(char* code, char *expect, atom_tree_t *tree, atom_t * (func)(struct t_tokenizer *, atom_t *)) {
     printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
-    struct t_tokenizer *tokenizer = new_tokenizer();
+    struct t_tokenizer *tokenizer = new_tokenizer(FALSE);
     int success = tokenize_stream(stream, tree, tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
     tree->root = func(tokenizer, NULL);
     assert(tokenizer->error != PARSE_ERROR);
     free_tokenizer(tokenizer);
-    char buff[1024];
-    buff[0] = '\0';
-    print_atom(tree->root, buff, 0, FALSE);
+    char *buff = NULL;
+    print_atom(tree->root, &buff, 0, FALSE);
     free_atom_tree(tree->root);
     printf("%s\n", buff);
     assert(!strcmp(buff, expect));
-
+    free(buff);
 }
 void test_parse_expr(char* code, char*expect, atom_tree_t *tree) {
     printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
-    struct t_tokenizer *tokenizer = new_tokenizer();
+    struct t_tokenizer *tokenizer = new_tokenizer(FALSE);
     int success = tokenize_stream(stream, tree, tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
     tree->root = parse_expr(tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
     free_tokenizer(tokenizer);
-    char buff[1024];
-    buff[0] = '\0';
-    print_atom(tree->root, buff, 0, FALSE);
+    char *buff = NULL;
+    print_atom(tree->root, &buff, 0, FALSE);
     free_atom_tree(tree->root);
     printf("%s\n", buff);
     assert(!strcmp(buff, expect));
+    free(buff);
 }
 void test_parse_block(char* code, char* expect, atom_tree_t *tree) {
     printf("%s\n", code);
     FILE *stream;
     stream = fmemopen(code, strlen(code), "r");
-    struct t_tokenizer *tokenizer = new_tokenizer();
+    struct t_tokenizer *tokenizer = new_tokenizer(FALSE);
     int success = tokenize_stream(stream, tree, tokenizer);
     assert(tokenizer->error != PARSE_ERROR);
     tree->root = parse_block(tokenizer, -1);
     assert(tokenizer->error != PARSE_ERROR);
     free_tokenizer(tokenizer);
-    char buff[2048];
-    buff[0] = '\0';
-    print_atom(tree->root, buff, 0, FALSE);
+    char *buff = NULL;
+    print_atom(tree->root, &buff, 0, FALSE);
     free_atom_tree(tree->root);
     printf("%s\n", buff);
     assert(!strcmp(buff, expect));
+    free(buff);
 }
 
 int main () {

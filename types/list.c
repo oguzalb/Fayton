@@ -275,12 +275,12 @@ object_t *new_list(object_t **args) {
 }
 
 void init_list() {
-    object_t *listiterator_class = new_class(strdup("listiterator"));
+    object_t *listiterator_class = new_class(strdup("listiterator"), NULL);
     listiterator_class->class_props->ob_func = new_listiterator;
     object_add_field(listiterator_class, "next", new_func(listiterator_next, strdup("next")));
     register_global(strdup("listiterator"), listiterator_class);
     
-    object_t *list_class = new_class(strdup("list"));
+    object_t *list_class = new_class(strdup("list"), NULL);
     list_class->class_props->ob_func = new_list;
     object_add_field(list_class, "__iter__", new_func(list_iter, strdup("__iter__")));
     object_add_field(list_class, "__getitem__", new_func(list_getitem, strdup("__getitem__")));

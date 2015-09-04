@@ -162,6 +162,25 @@ object_t *object_equals(object_t **args) {
     return new_bool_from_int(int_result->int_props->ob_ival == 0);
 }
 
+object_t *object_get_field_from_class(object_t *class, char *name) {
+    object_t *field = g_hash_table_lookup(class->fields, name);
+    if (field != NULL)
+        return field;
+    printd("CLASS FIELDS: %s\n", class->class_props->name);
+    g_hash_table_foreach(class->fields, print_var_each, NULL);
+    if (class->class_props->inherits == NULL) {
+        return NULL;
+    }
+    object_t **inherits = class->class_props->inherits;
+    while (*inherits != NULL && field == NULL) {
+        field = g_hash_table_lookup((*inherits)->fields, name);
+        if (field == NULL)
+            field = object_get_field_from_class(*inherits, name);
+        inherits++;
+    }
+    return field;
+}
+
 object_t *object_get_field_no_check(object_t *object, char* name) {
     printd("getting field |%s|\n", name);
     object_t *field = g_hash_table_lookup(object->fields, name);
@@ -173,18 +192,10 @@ object_t *object_get_field_no_check(object_t *object, char* name) {
     if (object->class == NULL) {
         return NULL;
     }
-    field = g_hash_table_lookup(object->class->fields, name);
-    if (field != NULL)
-        return field;
-    printd("CLASS FIELDS: %s\n", object->class->class_props->name);
-    g_hash_table_foreach(object->class->fields, print_var_each, NULL);
-    if (object->class->class_props->inherits == NULL) {
-        return NULL;
-    }
-    field = g_hash_table_lookup(object->class->class_props->inherits->fields, name);
+    field = object_get_field_from_class(object->class, name);
     if (field == NULL) {
-        printd("INHERITS FIELDS\n");
-        g_hash_table_foreach(object->class->class_props->inherits->fields, print_var_each, NULL);
+        //printd("INHERITS FIELDS\n");
+        //g_hash_table_foreach(object->class->class_props->inherits[0]->fields, print_var_each, NULL);
         return NULL;
     }
     printd("got field |%s|\n", name);
@@ -205,7 +216,7 @@ void object_add_field(object_t *object, char* name, object_t *field) {
 }
 
 void init_object() {
-    object_class = new_class(strdup("object"));
+    object_class = new_class(strdup("object"), NULL);
     object_class->class_props->ob_func = new_object_instance;
     object_add_field(object_class, "__str__", new_func(object_str, strdup("__str__")));
     object_add_field(object_class, "__eq__", new_func(object_equals, strdup("__eq__")));

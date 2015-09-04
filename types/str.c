@@ -107,7 +107,7 @@ object_t *new_str_internal(char* value) {
 }
 
 void init_str() {
-    object_t *str_class = new_class(strdup("str"));
+    object_t *str_class = new_class(strdup("str"), NULL);
     str_class->class_props->ob_func = new_str;
     object_add_field(str_class, "__repr__", new_func(str_repr, strdup("__repr__")));
     object_add_field(str_class, "__cmp__", new_func(str_cmp, strdup("__cmp__")));

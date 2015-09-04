@@ -59,7 +59,7 @@ int main() {
         atom_tree_t *tree = malloc(sizeof(atom_tree_t));
         g_array_append_val(trees, tree);
         stream = fmemopen(input, strlen(input), "r");
-        struct t_tokenizer *tokenizer = new_tokenizer();
+        struct t_tokenizer *tokenizer = new_tokenizer(TRUE);
         int success = tokenize_stream(stream, tree, tokenizer);
         if (tokenizer->error == PARSE_ERROR) {
             printf("Syntax error at line:%d\n", tokenizer->current_line);
@@ -77,11 +77,10 @@ int main() {
         }
         free_tokenizer(tokenizer);
         // this is for showing what we get as the ast tree, we won't have this when it is finished
-        char buff[10000];
-        buff[0] = '\0';
-        print_atom(tree->root, buff, 0, FALSE);
+        char *buff = NULL;
+        print_atom(tree->root, &buff, 0, FALSE);
         printf("%s\n", buff);
-        printd("interpreting\n", buff);
+        printd("interpreting\n");
         interpret_block(tree->root, interpreter.globals, 0);
         if (interpreter.error == RUN_ERROR) {
             struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);

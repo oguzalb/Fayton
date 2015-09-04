@@ -29,7 +29,7 @@ object_t *new_thread(object_t **args) {
 }
 
 void init_thread () {
-    object_t *thread_class = new_class(strdup("Thread"));
+    object_t *thread_class = new_class(strdup("Thread"), NULL);
     thread_class->class_props->ob_func = new_thread;
     register_global(strdup("Thread"), thread_class);
 }

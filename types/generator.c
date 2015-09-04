@@ -108,7 +108,7 @@ object_t *new_generator_internal(object_t **args, object_t* run_func) {
 }
 
 void init_generator() {
-    generator_class = new_class(strdup("generator"));
+    generator_class = new_class(strdup("generator"), NULL);
     object_add_field(generator_class, "next", new_func(generator_next, strdup("next")));
     object_add_field(generator_class, "__iter__", new_func(generator_iter, strdup("__iter__")));
 }

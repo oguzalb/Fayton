@@ -8,7 +8,7 @@ OBJECTS=$(SOURCES:.c=.o)
 	cc -c $< ${DEBUG} ${LIBS} ${FLAGS} -o $@
 
 tests: $(OBJECTS)
-	cc test_parse.c parse.o -o test_parse.out ${DEBUG} -g ${LIBS} ${FLAGS}
+	cc test_parse.c parse.o -o test_parse.out ${DEBUG} -g ${LIBS} ${FLAGS} utils.o
 	cc test_interpret.c ${OBJECTS} -o test_interpret.out ${DEBUG} -g ${LIBS} ${FLAGS}
 repl: $(OBJECTS)
 	cc repl.c ${OBJECTS} -o repl.out ${DEBUG} -g ${LIBS} ${FLAGS}
@@ -18,3 +18,6 @@ clean:
 test_run:  all
 	./test_parse.out
 	./test_interpret.out
+test_valgrind_run:  all
+	valgrind ./test_parse.out
+	valgrind ./test_interpret.out

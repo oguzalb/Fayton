@@ -127,7 +127,7 @@ object_t *new_int_internal(int value) {
 }
 
 void init_int() {
-    object_t *int_class = new_class(strdup("int"));
+    object_t *int_class = new_class(strdup("int"), NULL);
     int_class->class_props->ob_func = new_int;
     object_add_field(int_class, "__add__", new_func(int_add, strdup("__add__")));
     object_add_field(int_class, "__mul__", new_func(int_mul, strdup("__mul__")));

@@ -72,7 +72,7 @@ object_t *new_slice_internal(object_t *start, object_t *stop, object_t *step) {
 }
 
 void init_slice() {
-    object_t *slice_class = new_class(strdup("slice"));
+    object_t *slice_class = new_class(strdup("slice"), NULL);
     slice_class->class_props->ob_func = new_slice;
     register_global(strdup("slice"), slice_class);
 }

@@ -22,7 +22,7 @@ object_t *none_repr_func(object_t **args) {
 
 void init_none() {
     object_t *none_instance = new_object(NONE_TYPE);
-    object_t *none_class = new_class(strdup("NoneType"));
+    object_t *none_class = new_class(strdup("NoneType"), NULL);
     none_instance->class = none_class;
     object_add_field(none_class, "__repr__", new_func(none_repr_func, strdup("__repr__")));
     register_global(strdup("None"), none_instance);

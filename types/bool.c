@@ -65,7 +65,7 @@ object_t *bool_repr_func(object_t **args) {
 }
 
 void init_bool() {
-    object_t *bool_class = new_class(strdup("bool"));
+    object_t *bool_class = new_class(strdup("bool"), NULL);
     bool_class->class_props->ob_func = new_bool;
     object_add_field(bool_class, "__eq__", new_func(object_equals, strdup("__eq__")));
     object_add_field(bool_class, "__repr__", new_func(bool_repr_func, strdup("__repr__")));

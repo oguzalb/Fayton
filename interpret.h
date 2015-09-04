@@ -79,7 +79,7 @@ struct generatorfunc_type {
 
 struct class_type {
 // TODO CHAIN
-    struct _object *inherits;
+    struct _object **inherits;
     struct _object *(*ob_func)(struct _object **);
     char *name;
 };
@@ -136,7 +136,7 @@ object_t *new_func(object_t *(*)(object_t **), char *);
 void register_global(char*, object_t *);
 object_t *get_global(char*);
 object_t *get_global_no_check(char*);
-object_t *new_class(char*);
+object_t *new_class(char*, object_t **);
 int args_len(object_t **args);
 void print_var(char*, object_t*);
 #define set_exception(fmt, args...) \
