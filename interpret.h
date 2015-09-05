@@ -121,6 +121,7 @@ struct py_thread {
     char * exc_msg;
 };
 
+// TODO last accessed should be moved to threads sacrebleu!
 struct _interpreter {
     int error;
     object_t *last_accessed;

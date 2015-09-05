@@ -241,7 +241,7 @@ void init_interpreter() {
 //   int *index = pthread_getspecific(py_thread_key);
 //   free(index);
 //   pthread_setspecific(py_thread_key, NULL);
-  
+
     interpreter.globals = g_hash_table_new(g_str_hash, g_str_equal);
     interpreter.threads = g_array_new(TRUE, TRUE, sizeof(struct py_thread *));
     struct py_thread *main_thread = new_thread_struct();
@@ -393,7 +393,7 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
             inner_args[param_index++] = arg;
             closure_name = closure_name->next;
         }
-    }   
+    }
     printd("calling func type %s %s\n", object_type_name(func->type), func->func_props->name);
     printd("ADDED PARAMS\n");
     struct py_thread *thread = get_thread();
@@ -645,15 +645,15 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
                 return NULL;
             }
         }
-    } else if (stmt->type == A_IF) { 
+    } else if (stmt->type == A_IF) {
 printd("A_IF\n");
         return interpret_if(stmt, args, current_indent);
-    } else if (stmt->type == A_WHILE) { 
+    } else if (stmt->type == A_WHILE) {
 printd("A_WHILE\n");
         return interpret_while(stmt, args, current_indent);
     } else if (stmt->type == A_FUNCDEF) {
         atom_t *param = stmt->child->child;
-        GHashTable *kwargs = NULL; 
+        GHashTable *kwargs = NULL;
         while (param && param->child == NULL)
             param = param->next;
         if (param != NULL) {
@@ -681,9 +681,9 @@ printd("A_WHILE\n");
             if (field->type == A_FUNCDEF) {
                 char *trace_str;
                 asprintf(&trace_str, "%s.%s", class_name->value, field->value);
- 
+
                 atom_t *param = stmt->child->child;
-                GHashTable *kwargs = NULL; 
+                GHashTable *kwargs = NULL;
                 while (param && param->child == NULL)
                     param = param->next;
                 if (param != NULL) {
@@ -695,7 +695,7 @@ printd("A_WHILE\n");
                         g_hash_table_insert(kwargs, param->value, value);
                     }
                 }
- 
+
                 object_t *class_func = new_user_func(field, trace_str, kwargs);
                 object_add_field(class, field->value, class_func);
                 printd("added class field func %s.%s\n", class_name->value, field->value);
