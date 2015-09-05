@@ -629,8 +629,19 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
             return NULL;
         }
 
-        printd("ASSIGNMENT RAN\n");
-        if (result) {
+        if (left_var->type == A_ACCESSOR) {
+            object_t *object = interpret_expr(left_var->child, args, current_indent);
+            object_t *set_attr = object_get_field_no_check(object, "__setattr__");
+            if (set_attr != NULL) {
+                printf("%p object has __setattr__\n", object);
+                object_t *field_name = new_str(left_var->child->next->value);
+                object_t *params = {object, field_name, result, NULL};
+                object_call_func_obj(set_attr, params);
+            } else {
+                printf("%p object does not have __setattr__\n", object);
+                object_set_field(object, left_var->child->next->value, result);
+            }
+        } else {
             print_var("result", result);
             set_var(args, left_var, result);
         }

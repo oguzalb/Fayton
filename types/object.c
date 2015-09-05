@@ -181,6 +181,11 @@ object_t *object_get_field_from_class(object_t *class, char *name) {
     return field;
 }
 
+object_t *object_set_field(object_t *object, char* field_name, object_t *value) {
+    g_hash_table_insert(object->fields, field_name, value);
+    return new_none_internal();
+}
+
 object_t *object_get_field_no_check(object_t *object, char* name) {
     printd("getting field |%s|\n", name);
     object_t *field = g_hash_table_lookup(object->fields, name);
