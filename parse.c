@@ -98,7 +98,7 @@ freevar_t *get_freevar(struct t_tokenizer *tokenizer, atom_t *value) {
         }
         value->cl_index = prev_index;
     }
-    
+
     printd("name: %s cl_index: %d context_index: %d\n", value->value, value->cl_index, tokenizer->func_contexts->len-1);
     return freevar;
 }
@@ -209,7 +209,7 @@ atom_t *new_atom(char *value, int type) {
     atom->type = type;
     atom->value = value;
     if (type == A_FUNCDEF || type == A_GENFUNCDEF)
-        atom->context = g_hash_table_new(g_str_hash, g_str_equal); 
+        atom->context = g_hash_table_new(g_str_hash, g_str_equal);
     atom->next = NULL;
     atom->child = NULL;
     atom->cl_index = -1;
@@ -289,7 +289,7 @@ int token(struct t_tokenizer *tokenizer, char *buffer, FILE *fp) {
                 buffer[i] = '\0';
                 return PARSE_ERROR;
             } else if (cur_type == T_IDENTIFIER) {
-            
+
             }
             else break;
             i++;
@@ -411,7 +411,7 @@ atom_t *parse_var(struct t_tokenizer *tokenizer, atom_t *prev_arg) {
         add_child_atom(accessor, var);
         add_child_atom(accessor, sec_var);
         if ((*tokenizer->iter)->type != T_DOTCHAR)
-            return accessor; 
+            return accessor;
         atom_t *right = parse_var(tokenizer, accessor);
         if (tokenizer->error == PARSE_ERROR)
             return NULL;
@@ -751,7 +751,7 @@ printd("PARSE_ATOM START\n");
         tokenizer->iter++;
         return var;
     } else if (first_arg->type == T_IDENTIFIER) {
-        atom_t *var = new_atom(strdup(first_arg->value), A_VAR); 
+        atom_t *var = new_atom(strdup(first_arg->value), A_VAR);
         struct t_token *token = *tokenizer->iter;
 // TODO don't forget adding obracket for slices
         tokenizer->iter++;
@@ -1149,12 +1149,14 @@ atom_t *parse_tuple(struct t_tokenizer *tokenizer, int assignment_stmt) {
 atom_t *parse_inherits(struct t_tokenizer *tokenizer) {
     atom_t * params = new_atom(strdup("params"), A_PARAMS);
     struct t_token * ophar = *tokenizer->iter;
-    if (ophar == NULL || ophar->type != T_OPHAR) {
+    if (ophar == NULL) {
         tokenizer->error = PARSE_ERROR;
         free_atom_tree(params);
         printf("PARSE_PARAMS OPHAR ERR\n");
         return NULL;
     }
+    if (ophar->type != T_OPHAR)
+        return params;
     tokenizer->iter++;
     struct t_token *token;
     while((token = *(tokenizer->iter)) && token->type != T_CPHAR) {
@@ -1905,7 +1907,7 @@ int tokenize_stream(FILE *fp, atom_tree_t* root, struct t_tokenizer *tokenizer) 
         tokenizer->iter++;
     }
     tokenizer->iter = tokenizer->tokens;
-    return 1; 
+    return 1;
 }
 
 void free_tokenizer(struct t_tokenizer *tokenizer) {

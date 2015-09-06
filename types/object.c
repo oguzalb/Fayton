@@ -38,20 +38,25 @@ object_t *new_object(int type) {
 }
 
 object_t *new_object_instance(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("An argument expected\n");
-        return NULL;
-    }
     object_t *object = (object_t *) malloc(sizeof(object_t));
     object->fields = g_hash_table_new(g_str_hash, g_str_equal);
     object->class = args[0];
     object->type = CUSTOMOBJECT_TYPE;
+    object_t *init_func = object_get_field_no_check(object, "__init__");
+    if (init_func != NULL) {
+        object_t *result = object_call_func_obj(init_func, args);
+        if (result != new_none_internal()) {
+            set_exception("__init__() should return None");
+            return NULL;
+        }
+    }
     return object;
 }
 
 object_t *object_call_func_obj(object_t *func, object_t **param_objs) {
     object_t *result = NULL;
     if (func->type == USERFUNC_TYPE || func->type == GENERATORFUNC_TYPE) {
+printf("calling userfunc\n");
         result = interpret_funcblock(func->userfunc_props->ob_userfunc->child->next, param_objs, /* TODO */0);
     } else if (func->type == FUNC_TYPE) {
         result = func->func_props->ob_func(param_objs);
@@ -189,7 +194,7 @@ object_t *object_set_field(object_t *object, char* field_name, object_t *value) 
 object_t *object_get_field_no_check(object_t *object, char* name) {
     printd("getting field |%s|\n", name);
     object_t *field = g_hash_table_lookup(object->fields, name);
-    if (field != NULL) { 
+    if (field != NULL) {
         return field;
     }
     printd("OBJECT FIELDS\n");

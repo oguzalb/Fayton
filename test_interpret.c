@@ -184,12 +184,12 @@ class C(B, A):\n\
             print 3\n\
 c = C()\n\
 c.func()", &tree);
-/*    test_interpret_block(
+    test_interpret_block(
 "class Cat:\n\
     def __init__(self, value):\n\
         self.value = value\n\
 c = Cat()\n\
-print(c.value)", &tree);*/
+print(c.value)", &tree);
     return 0;
 }
 

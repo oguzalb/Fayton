@@ -127,7 +127,11 @@ object_t *lookup_var(object_t **args, atom_t *var) {
     }
     if (obj == NULL) {
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
-        set_exception(var->cl_index == -1 ?"Global not found |%s|\n":"Local not found!!!|%s|\n", var->value);
+        if (var->cl_index == -1) {
+            set_exception("Global not found |%s|\n", var->value);
+        } else {
+            set_exception("Local not found!!!|%s| arglen: %d\n", var->value, (sizeof(args) / sizeof(object_t *)));
+        }
         return NULL;
     }
     return obj;
@@ -258,7 +262,7 @@ void init_interpreter() {
 //   int *index = pthread_getspecific(py_thread_key);
 //   free(index);
 //   pthread_setspecific(py_thread_key, NULL);
-  
+
     interpreter.globals = g_hash_table_new(g_str_hash, g_str_equal);
     interpreter.threads = g_array_new(TRUE, TRUE, sizeof(struct py_thread *));
     struct py_thread *main_thread = new_thread_struct();
@@ -702,15 +706,15 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
                 return NULL;
             }
         }
-    } else if (stmt->type == A_IF) { 
+    } else if (stmt->type == A_IF) {
 printd("A_IF\n");
         return interpret_if(stmt, args, current_indent);
-    } else if (stmt->type == A_WHILE) { 
+    } else if (stmt->type == A_WHILE) {
 printd("A_WHILE\n");
         return interpret_while(stmt, args, current_indent);
     } else if (stmt->type == A_FUNCDEF) {
         atom_t *param = stmt->child->child;
-        GHashTable *kwargs = NULL; 
+        GHashTable *kwargs = NULL;
         while (param && param->child == NULL)
             param = param->next;
         if (param != NULL) {
@@ -758,9 +762,9 @@ printd("A_WHILE\n");
             if (field->type == A_FUNCDEF) {
                 char *trace_str;
                 asprintf(&trace_str, "%s.%s", class_name->value, field->value);
- 
+
                 atom_t *param = stmt->child->child;
-                GHashTable *kwargs = NULL; 
+                GHashTable *kwargs = NULL;
                 while (param && param->child == NULL)
                     param = param->next;
                 if (param != NULL) {
