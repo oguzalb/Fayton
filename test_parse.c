@@ -302,9 +302,14 @@ int main () {
           VAR:i\n\
           VAR:j\n", &tree);
 
-    test_parse_block("def add(a, b):\n    return a + b",
+    test_parse_block(
+"def add(a, b):\n\
+    return a + b",
 "BLOCK:block\n\
   FUNCDEF:add\n\
+    FREEVARS:\n\
+      a:0\n\
+      b:1\n\
     PARAMS:params\n\
       VAR:a\n\
       VAR:b\n\
@@ -338,12 +343,19 @@ int main () {
       INTEGER:7\n\
       INTEGER:4\n\
       INTEGER:8\n", &tree);
-    test_parse_block("class Hede(object):\n    def __add__(self, other):\n        return self.value + other\n    value = 10\n",
+    test_parse_block(
+"class Hede(object):\n\
+    def __add__(self, other):\n\
+        return self.value + other\n\
+    value = 10\n",
 "BLOCK:block\n\
   CLASS:Hede\n\
     PARAMS:params\n\
       VAR:object\n\
     FUNCDEF:__add__\n\
+      FREEVARS:\n\
+        other:1\n\
+        self:0\n\
       PARAMS:params\n\
         VAR:self\n\
         VAR:other\n\
@@ -471,6 +483,7 @@ else:\n\
     test_parse_block("def func():\n\    yield a", 
 "BLOCK:block\n\
   GENFUNCDEF:func\n\
+    FREEVARS:\n\
     PARAMS:params\n\
     BLOCK:block\n\
       YIELD:yield\n\
@@ -478,6 +491,7 @@ else:\n\
     test_parse_block("def func():\n\    while True:\n\        yield a", 
 "BLOCK:block\n\
   GENFUNCDEF:func\n\
+    FREEVARS:\n\
     PARAMS:params\n\
     BLOCK:block\n\
       WHILE:WHILE\n\
@@ -488,9 +502,12 @@ else:\n\
     test_parse_block("def func():\n\    def func2():\n\        yield a\n\    return 1",
 "BLOCK:block\n\
   FUNCDEF:func\n\
+    FREEVARS:\n\
+      func2:0\n\
     PARAMS:params\n\
     BLOCK:block\n\
       GENFUNCDEF:func2\n\
+        FREEVARS:\n\
         PARAMS:params\n\
         BLOCK:block\n\
           YIELD:yield\n\
@@ -533,12 +550,17 @@ else:\n\
         yield b",
 "BLOCK:block\n\
   FUNCDEF:func\n\
+    FREEVARS:\n\
+      func2:1\n\
+      a:0\n\
     PARAMS:params\n\
     BLOCK:block\n\
       ASSIGNMENT:=\n\
         VAR:a\n\
         INTEGER:5\n\
       GENFUNCDEF:func2\n\
+        FREEVARS:\n\
+          a:0\n\
         PARAMS:params\n\
           CLOSURE:a\n\
         BLOCK:block\n\
@@ -559,7 +581,40 @@ else:\n\
         PARAMS:params\n\
           INTEGER:1\n",
 &tree);
-
+    test_parse_block(
+"class Cat:\n\
+    def __init__(self, value):\n\
+        self.value = value\n\
+c = Cat()\n\
+print(c.value)",
+"BLOCK:block\n\
+  CLASS:Cat\n\
+    PARAMS:params\n\
+    FUNCDEF:__init__\n\
+      FREEVARS:\n\
+        value:1\n\
+        self:0\n\
+      PARAMS:params\n\
+        VAR:self\n\
+        VAR:value\n\
+      BLOCK:block\n\
+        ASSIGNMENT:=\n\
+          ACCESSOR:.\n\
+            VAR:self\n\
+            VAR:value\n\
+          VAR:value\n\
+  ASSIGNMENT:=\n\
+    VAR:c\n\
+    FUNCCALL:()call\n\
+      VAR:Cat\n\
+      PARAMS:params\n\
+  FUNCCALL:()call\n\
+    VAR:print\n\
+    PARAMS:params\n\
+      ACCESSOR:.\n\
+        VAR:c\n\
+        VAR:value\n",
+&tree);
     //fclose(stream);
     return 0;
     //fclose(fp);

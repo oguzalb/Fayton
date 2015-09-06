@@ -65,6 +65,8 @@ typedef struct _atom_t {
 // this will be refactored
 // for functions
     GHashTable *context;
+    struct _object **args;
+    int args_count;
     struct _atom_t *child;
     struct _atom_t *next;
 } atom_t;

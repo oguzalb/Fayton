@@ -212,6 +212,9 @@ atom_t *new_atom(char *value, int type) {
         atom->context = g_hash_table_new(g_str_hash, g_str_equal);
     atom->next = NULL;
     atom->child = NULL;
+    atom->context = NULL;
+    atom->args = NULL;
+    atom->args_count = 0;
     atom->cl_index = -1;
     printd("CREATING ATOM: %s %s\n", value, atom_type_name(type));
     return atom;
@@ -255,11 +258,32 @@ void print_atom(atom_t *atom, char** dest, int indent, int test) {
     if (test != TRUE) {
         cursor = fay_strcat(dest, "\n", cursor);
     }
+    GHashTableIter iter;
+    gpointer _key, value;
+    if (atom->context != NULL) {
+        for (i=0; i<indent + 2; i++)
+            cursor = fay_strcat(dest, test ? "|" : " ", cursor);
+        cursor = fay_strcat(dest, "FREEVARS:\n", cursor);
+        g_hash_table_iter_init (&iter, atom->context);
+        while (g_hash_table_iter_next (&iter, &_key, &value)) {
+            char *key = _key;
+            freevar_t *freevar = value;
+            for (i=0; i<indent + 4; i++)
+                cursor = fay_strcat(dest, test ? "|" : " ", cursor);
+            cursor = fay_strcat(dest, key, cursor);
+            cursor = fay_strcat(dest, ":", cursor);
+            char *buff[33];
+            snprintf(buff, 33, "%d", freevar->cl_index);
+            cursor = fay_strcat(dest, buff, cursor);
+            cursor = fay_strcat(dest, "\n", cursor);
+        }
+    }
+ 
     if (atom->child) {
         atom_t *child = atom->child;
         print_atom(child, dest, indent+2, test);
         while (child->next) {
-            print_atom(child->next, dest, indent+2, test);
+           print_atom(child->next, dest, indent+2, test);
             child = child->next;
         }
     }
@@ -1312,12 +1336,13 @@ atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
     g_hash_table_foreach(context, print_freevar_each, NULL);
     printd("function context ends:\n");
     add_closures_to_params(tokenizer, params, context);
+    
     context = pop_cl_context(tokenizer);
     funcdef->context = context;
 // TODO functions should be redefined
     freevar_t *function = add_freevar(tokenizer, funcdef);
-    if (function != NULL)
-        g_hash_table_insert(funcdef->context, func_name->value, function);
+    //if (function != NULL)
+        //g_hash_table_insert(funcdef->context, func_name->value, function);
     add_child_atom(funcdef, params);
     add_child_atom(funcdef, block);
     return funcdef;
@@ -1431,7 +1456,16 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
             add_child_atom(params, expr);
             add_child_atom(stmt, params);
         } else if (token->type == T_EQUALS) {
-            add_freevar(tokenizer, var);
+            if (var->type == A_ACCESSOR) {
+                atom_t *root_var = var->child;
+                while (root_var != NULL && root_var->type != A_VAR) {
+                    root_var = root_var->child;}
+                assert(var != NULL);
+                add_freevar(tokenizer, root_var);
+            } else {
+                assert(var->type == A_VAR);
+                add_freevar(tokenizer, var);
+            }
             tokenizer->iter++;
             stmt = new_atom(strdup("="), A_ASSIGNMENT);
             add_child_atom(stmt, var);
