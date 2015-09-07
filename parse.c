@@ -220,6 +220,12 @@ atom_t *new_atom(char *value, int type) {
     return atom;
 }
 
+atom_tree_t *new_atom_tree() {
+    atom_tree_t *atom_tree = malloc(sizeof(atom_tree_t));
+    atom_tree->root = NULL;
+    return atom_tree;
+}
+
 atom_t *add_next_atom(atom_t *atom, void *value, int type) {
     atom_t *n_atom = new_atom(value, type);
     atom->next = n_atom;
@@ -255,6 +261,11 @@ void print_atom(atom_t *atom, char** dest, int indent, int test) {
     cursor = fay_strcat(dest, atom_type_name(atom->type), cursor);
     cursor = fay_strcat(dest, ":", cursor);
     cursor = fay_strcat(dest,  atom->value, cursor);
+    if (atom->type == A_VAR) {
+        char *buff[32];
+        snprintf(buff, 33, ":%d", atom->cl_index);
+        cursor = fay_strcat(dest,  buff, cursor);
+    }
     if (test != TRUE) {
         cursor = fay_strcat(dest, "\n", cursor);
     }
@@ -390,6 +401,10 @@ int token(struct t_tokenizer *tokenizer, char *buffer, FILE *fp) {
             fseek(fp, -1, SEEK_CUR);
             break;
         }
+        if (cur_type == T_INITIAL) {
+            tokenizer->error = PARSE_ERROR;
+            break;
+        }
     }
     buffer[i] = '\0';
     return cur_type;
@@ -406,6 +421,7 @@ atom_t *parse_var(struct t_tokenizer *tokenizer, atom_t *prev_arg) {
             return NULL;
         }
         var = new_atom(strdup(token->value), A_VAR);
+        get_freevar(tokenizer, var);
         tokenizer->iter++;
         token = *tokenizer->iter;
     } else {
@@ -1794,7 +1810,7 @@ atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
             return NULL;
         }
         start_count = *indent->value;
-       tokenizer->iter++;
+        tokenizer->iter++;
         if (start_count <= current_indent || token == NULL) {
     printf("PARSE_CLASS_INDENT_PARSE_ERROR_ start %d prev %d\n", start_count, current_indent);
             free_atom_tree(class);
@@ -1877,11 +1893,11 @@ int tokenize_stream(FILE *fp, atom_tree_t* root, struct t_tokenizer *tokenizer) 
         tokenizer->tokens[i] = token;
         i++;
     }
+    tokenizer->tokens[i] = NULL;
     if (type == PARSE_ERROR) {
         tokenizer->error = PARSE_ERROR;
-        return 0;
+        return FALSE;
     }
-    tokenizer->tokens[i] = NULL;
     tokenizer->iter = tokenizer->tokens;
     while (*tokenizer->iter != NULL) {
         print_token(*tokenizer->iter);
@@ -1941,14 +1957,14 @@ int tokenize_stream(FILE *fp, atom_tree_t* root, struct t_tokenizer *tokenizer) 
         tokenizer->iter++;
     }
     tokenizer->iter = tokenizer->tokens;
-    return 1;
+    return TRUE;
 }
 
 void free_tokenizer(struct t_tokenizer *tokenizer) {
     printd("Freeing tokenizer\n");
     tokenizer->iter = tokenizer->tokens;
     while (*(tokenizer->iter) != NULL) {
-        struct t_token *token = *tokenizer->iter;
+        struct t_token *token = *(tokenizer->iter);
         printd("Freeing token %p", token->value);
         print_token(token);
         free(token->value);

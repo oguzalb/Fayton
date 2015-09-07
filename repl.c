@@ -56,7 +56,7 @@ int main() {
         printf("code:%s\n", input);
         if (!strncmp(input, "quit()", 6))
             break;
-        atom_tree_t *tree = malloc(sizeof(atom_tree_t));
+        atom_tree_t *tree = new_atom_tree();
         g_array_append_val(trees, tree);
         stream = fmemopen(input, strlen(input), "r");
         struct t_tokenizer *tokenizer = new_tokenizer(TRUE);
@@ -92,7 +92,10 @@ int main() {
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
     }
     atom_tree_t *tree;
-    for (int i=0; tree = g_array_index(trees, atom_tree_t *, i); i++)
-        free_atom_tree(tree->root);
+    for (int i=0; tree = g_array_index(trees, atom_tree_t *, i); i++) {
+        if (tree->root != NULL)
+            free_atom_tree(tree->root);
+        free(tree);
+    }
     g_array_free(trees, TRUE);
 }

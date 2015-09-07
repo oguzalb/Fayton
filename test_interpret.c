@@ -188,7 +188,7 @@ c.func()", &tree);
 "class Cat:\n\
     def __init__(self, value):\n\
         self.value = value\n\
-c = Cat()\n\
+c = Cat(\"Tom\")\n\
 print(c.value)", &tree);
     return 0;
 }
