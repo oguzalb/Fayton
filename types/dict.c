@@ -1,13 +1,9 @@
 #include "dict.h"
 
-object_t *dict_keys(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("one argument expected\n");
-        return NULL;
-    }
+object_t *dict_keys(object_t **args, int count) {
     object_t *self = args[0];
     GList *keys = g_hash_table_get_keys(self->dict_props->ob_dval);
-    object_t *keysobj = new_list(NULL);
+    object_t *keysobj = new_list(NULL, 0);
     GList *iter = keys;
     while (iter != NULL) {
         g_array_append_val(keysobj->list_props->ob_aval, iter->data);
@@ -18,14 +14,10 @@ object_t *dict_keys(object_t **args) {
     return keysobj;
 }
 
-object_t *dict_values(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("one argument expected\n");
-        return NULL;
-    }
+object_t *dict_values(object_t **args, int count) {
     object_t *self = args[0];
     GList *values = g_hash_table_get_values(self->dict_props->ob_dval);
-    object_t *valuesobj = new_list(NULL);
+    object_t *valuesobj = new_list(NULL, 0);
     GList *iter = values;
     while (iter != NULL) {
         g_array_append_val(valuesobj->list_props->ob_aval, iter->data);
@@ -36,11 +28,7 @@ object_t *dict_values(object_t **args) {
     return valuesobj;
 }
 
-object_t *dict_repr(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("one argument expected\n");
-        return NULL;
-    }
+object_t *dict_repr(object_t **args, int count) {
     GHashTableIter iter;
     gpointer key, value;
 
@@ -66,8 +54,7 @@ object_t *dict_repr(object_t **args) {
     return  new_str_internal(str);
 }
 
-object_t *dict_get(object_t **args) {
-    int count = args_len(args);
+object_t *dict_get(object_t **args, int count) {
     if (count != 2 && count != 3) {
         set_exception("Two/Three arguments expected\n");
         return NULL;
@@ -78,12 +65,8 @@ object_t *dict_get(object_t **args) {
     return obj != NULL ? obj : (args[2]?args[2]:new_none_internal());
 }
 
-object_t *dict_getitem(object_t **args) {
-    if (args_len(args) != 2) {
-        set_exception("Two arguments expected\n");
-        return NULL;
-    }
-    object_t *value = dict_get(args);
+object_t *dict_getitem(object_t **args, int count) {
+    object_t *value = dict_get(args, count);
     if (interpreter.error == RUN_ERROR)
         return NULL;
     if (value == NULL || value->type == NONE_TYPE) {
@@ -93,11 +76,7 @@ object_t *dict_getitem(object_t **args) {
     return value;
 }
 
-object_t *dict_setitem(object_t **args) {
-    if (args_len(args) != 3) {
-        set_exception("expected 3 arguments\n");
-        return NULL;
-    }
+object_t *dict_setitem(object_t **args, int count) {
     object_t *self = args[0];
     object_t *key = args[1];
     object_t *val = args[2];
@@ -105,7 +84,12 @@ object_t *dict_setitem(object_t **args) {
     return new_none_internal();
 }
 
-object_t *new_dict(object_t **args) {
+object_t *new_dict(object_t **args, int count) {
+printf("initializing dict\n");
+    if (count > 1) {
+        set_exception("dict from iterable not implemented yet\n");
+        return NULL;
+    }
     // TODO args check
     object_t * dict = new_object(DICTIONARY_TYPE);
     dict->class = get_global("dict");
@@ -115,14 +99,13 @@ object_t *new_dict(object_t **args) {
 }
 
 void init_dict() {
-    object_t *dict_class = new_class(strdup("dict"), NULL);
-    dict_class->class_props->ob_func = new_dict;
+    object_t *dict_class = new_class(strdup("dict"), NULL, new_dict, 1);
     //object_add_field(dict_class, "__iter__", new_func(iter_dict_func));
-    object_add_field(dict_class, "keys", new_func(dict_keys, strdup("keys")));
-    object_add_field(dict_class, "values", new_func(dict_keys, strdup("values")));
-    object_add_field(dict_class, "get", new_func(dict_get, strdup("keys")));
-    object_add_field(dict_class, "__getitem__", new_func(dict_getitem, strdup("__getitem__")));
-    object_add_field(dict_class, "__setitem__", new_func(dict_setitem, strdup("__setitem__")));
-    object_add_field(dict_class, "__repr__", new_func(dict_repr, strdup("__repr__")));
+    object_add_field(dict_class, "keys", new_func(dict_keys, strdup("keys"), 1));
+    object_add_field(dict_class, "values", new_func(dict_keys, strdup("values"), 1));
+    object_add_field(dict_class, "get", new_func(dict_get, strdup("keys"), 1));
+    object_add_field(dict_class, "__getitem__", new_func(dict_getitem, strdup("__getitem__"), 2));
+    object_add_field(dict_class, "__setitem__", new_func(dict_setitem, strdup("__setitem__"), 3));
+    object_add_field(dict_class, "__repr__", new_func(dict_repr, strdup("__repr__"), 1));
     register_global(strdup("dict"), dict_class);
 }

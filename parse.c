@@ -261,7 +261,7 @@ void print_atom(atom_t *atom, char** dest, int indent, int test) {
     cursor = fay_strcat(dest, atom_type_name(atom->type), cursor);
     cursor = fay_strcat(dest, ":", cursor);
     cursor = fay_strcat(dest,  atom->value, cursor);
-    if (atom->type == A_VAR) {
+    if (atom->type == A_VAR || atom->type == A_FUNCDEF || atom->type == A_CLASS || atom->type == A_GENFUNCDEF) {
         char *buff[32];
         snprintf(buff, 33, ":%d", atom->cl_index);
         cursor = fay_strcat(dest,  buff, cursor);
@@ -1790,11 +1790,18 @@ atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
         return NULL;
     }
     tokenizer->iter++;
-    if ((*tokenizer->iter)->type == T_EOL)
+    struct t_token *eol = *tokenizer->iter;
+    if (eol == NULL) {
+        printf("PARSE_CLASS EOL ERROR");
+        free_atom_tree(class);
+        tokenizer->error = PARSE_ERROR;
+        return NULL;
+    }
+    if (eol->type == T_EOL)
         tokenizer->iter++;
     struct t_token *indent = *tokenizer->iter;
-    if (indent->type != T_INDENT) {
-    printf("PARSE_CLASS_NO_INDENT_PARSE_ERROR_ \n");
+    if (indent == NULL || indent->type != T_INDENT) {
+    printf("PARSE_CLASS_NO_INDENT_PARSE_ERROR_\n");
         free_atom_tree(class);
         tokenizer->error = PARSE_ERROR;
         return NULL;

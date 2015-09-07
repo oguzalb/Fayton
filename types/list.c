@@ -8,16 +8,12 @@
     *((((object_t **))(void *) glist->data) + index) = item
 
 
-object_t *new_listiterator(object_t **args) {
+object_t *new_listiterator(object_t **args, int count) {
     object_t *list = args[0];
     return new_listiterator_internal(list);
 }
 
-object_t *listiterator_next(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("No arguments");
-        return NULL;
-    }
+object_t *listiterator_next(object_t **args, int count) {
     object_t *iterator = args[0];
     object_t **objectp = iterator->listiterator_props->objectp;
     if (*objectp != NULL)
@@ -25,35 +21,23 @@ object_t *listiterator_next(object_t **args) {
     return *objectp;
 }
 
-object_t *list_iter(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("No arguments");
-        return NULL;
-    }
+object_t *list_iter(object_t **args, int count) {
     printd("__iter__ creating list iterator from list\n");
     object_t *list = args[0];
     return new_listiterator_internal(list);
 }
 
-object_t *list_append(object_t **args) {
-    if (args_len(args) != 2) {
-        set_exception("needs two arguments");
-        return NULL;
-    }
+object_t *list_append(object_t **args, int count) {
     object_t *list = args[0];
     object_t *item = args[1];
     g_array_append_val(list->list_props->ob_aval, item);
     return new_none_internal();
 }
 
-object_t *list_insert(object_t **args) {
+object_t *list_insert(object_t **args, int count) {
     object_t *list = args[0];
     object_t *index = args[1];
     object_t *item = args[2];
-    if (args_len(args) != 3) {
-        set_exception("needs three arguments");
-        return NULL;
-    }
     if (index->type != INT_TYPE) {
         set_exception("Second type is not int");
         return NULL;
@@ -66,11 +50,7 @@ object_t *list_insert(object_t **args) {
     return new_none_internal();
 }
 
-object_t *list_extend(object_t **args) {
-    if (args_len(args) != 2) {
-        set_exception("needs two arguments");
-        return NULL;
-    }
+object_t *list_extend(object_t **args, int count) {
     object_t *list = args[0];
     object_t *list2 = args[1];
     GArray *list2_ob_aval = list2->list_props->ob_aval;
@@ -84,15 +64,11 @@ object_t *list_extend(object_t **args) {
     return new_none_internal();
 }
 
-object_t *list_reverse(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("needs one argument");
-        return NULL;
-    }
+object_t *list_reverse(object_t **args, int count) {
     object_t *list = args[0];
     GArray *list_ob_aval = list->list_props->ob_aval;
     object_t **plast; object_t **p;
-    for (p=get_garray_begin(list_ob_aval), plast=get_garray_end(list_ob_aval); *p != *plast; p++, plast--) {
+    for (p=get_garray_begin(list_ob_aval), plast=get_garray_end(list_ob_aval); p < plast; p++, plast--) {
         object_t *temp = *p;
         *p = *plast;
         *plast = temp;
@@ -100,11 +76,7 @@ object_t *list_reverse(object_t **args) {
     return new_none_internal();
 }
 
-object_t *list_add(object_t **args) {
-    if (args_len(args) != 2) {
-        set_exception("needs two arguments");
-        return NULL;
-    }
+object_t *list_add(object_t **args, int count) {
     object_t *list = args[0];
     object_t *list2 = args[1];
     object_t *list3 = new_list_internal();
@@ -123,11 +95,7 @@ object_t *list_add(object_t **args) {
     return list3;
 }
 
-object_t *list_pop(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("needs an argument");
-        return NULL;
-    }
+object_t *list_pop(object_t **args, int count) {
     object_t *self = args[0];
     GArray *self_ob_aval = self->list_props->ob_aval;
 // Throw IndexError
@@ -156,11 +124,7 @@ object_t *new_listiterator_internal(object_t *list) {
     return listiterator;
 }
 
-object_t *list_setitem(object_t **args) {
-    if (args_len(args) != 3) {
-        set_exception("needs three argument");
-        return NULL;
-    }
+object_t *list_setitem(object_t **args, int count) {
     object_t *self = args[0];
     object_t *index = args[1];
     object_t *item = args[2];
@@ -186,11 +150,7 @@ object_t *list_setitem(object_t **args) {
     return new_none_internal();
 }
 
-object_t *list_getitem(object_t **args) {
-    if (args_len(args) != 2) {
-        set_exception("needs two arguments");
-        return NULL;
-    }
+object_t *list_getitem(object_t **args, int count) {
     object_t *list = args[0];
     object_t *slice = args[1];
     if (slice->type == INT_TYPE) {
@@ -243,11 +203,7 @@ object_t *new_list_internal() {
     return list;
 }
 
-object_t *list_repr(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("needs an argument");
-        return NULL;
-    }
+object_t *list_repr(object_t **args, int count) {
     object_t *self = args[0];
     char *str = NULL;
     char *cursor = NULL;
@@ -264,33 +220,40 @@ object_t *list_repr(object_t **args) {
     return repr;
 }
 
-object_t *new_list(object_t **args) {
+object_t *new_list(object_t **args, int count) {
+    if (count > 2) {
+        set_exception("list takes at most two arguments\n");
+        return NULL;
+    }
     object_t *list;
     // TODO this should iterate and copy list
-    if (args != NULL && args[0] != NULL)
-        list = args[0];
-    else
+    if (args != NULL && count > 1) {
+        list = args[1]; 
+        if (list->type != LIST_TYPE) {
+            // TODO should be iterable
+            set_exception("list takes list as an argument\n");
+            return NULL;
+        }
+    } else
         list = new_list_internal();
     return list;
 }
 
 void init_list() {
-    object_t *listiterator_class = new_class(strdup("listiterator"), NULL);
-    listiterator_class->class_props->ob_func = new_listiterator;
-    object_add_field(listiterator_class, "next", new_func(listiterator_next, strdup("next")));
+    object_t *listiterator_class = new_class(strdup("listiterator"), NULL, new_listiterator, 2);
+    object_add_field(listiterator_class, "next", new_func(listiterator_next, strdup("next"), 1));
     register_global(strdup("listiterator"), listiterator_class);
     
-    object_t *list_class = new_class(strdup("list"), NULL);
-    list_class->class_props->ob_func = new_list;
-    object_add_field(list_class, "__iter__", new_func(list_iter, strdup("__iter__")));
-    object_add_field(list_class, "__getitem__", new_func(list_getitem, strdup("__getitem__")));
-    object_add_field(list_class, "__setitem__", new_func(list_setitem, strdup("__setitem__")));
-    object_add_field(list_class, "append", new_func(list_append, strdup("append")));
-    object_add_field(list_class, "extend", new_func(list_extend, strdup("extend")));
-    object_add_field(list_class, "insert", new_func(list_insert, strdup("insert")));
-    object_add_field(list_class, "__add__", new_func(list_add, strdup("__add__")));
-    object_add_field(list_class, "__repr__", new_func(list_repr, strdup("__repr__")));
-    object_add_field(list_class, "pop", new_func(list_pop, strdup("pop")));
-    object_add_field(list_class, "reverse", new_func(list_reverse, strdup("reverse")));
+    object_t *list_class = new_class(strdup("list"), NULL, new_list, -1);
+    object_add_field(list_class, "__iter__", new_func(list_iter, strdup("__iter__"), 1));
+    object_add_field(list_class, "__getitem__", new_func(list_getitem, strdup("__getitem__"), 2));
+    object_add_field(list_class, "__setitem__", new_func(list_setitem, strdup("__setitem__"), 2));
+    object_add_field(list_class, "append", new_func(list_append, strdup("append"), 2));
+    object_add_field(list_class, "extend", new_func(list_extend, strdup("extend"), 2));
+    object_add_field(list_class, "insert", new_func(list_insert, strdup("insert"), 3));
+    object_add_field(list_class, "__add__", new_func(list_add, strdup("__add__"), 2));
+    object_add_field(list_class, "__repr__", new_func(list_repr, strdup("__repr__"), 1));
+    object_add_field(list_class, "pop", new_func(list_pop, strdup("pop"), 2));
+    object_add_field(list_class, "reverse", new_func(list_reverse, strdup("reverse"), 1));
     register_global(strdup("list"), list_class);
 }

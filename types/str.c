@@ -1,11 +1,7 @@
 #include "str.h"
 
-object_t *new_str(object_t **args) {
+object_t *new_str(object_t **args, int count) {
     printd("NEW STR\n");
-    if (args_len(args) != 2) {
-        set_exception("Needs two string arguments\n");
-        return NULL;
-    }
     object_t *str_obj = args[1];
     if (str_obj->type != STR_TYPE) {
         set_exception("Parameter should be str\n");
@@ -14,42 +10,26 @@ object_t *new_str(object_t **args) {
     return str_obj;
 }
 
-object_t *str_repr(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("Needs string argument\n");
-        return NULL;
-    }
+object_t *str_repr(object_t **args, int count) {
     object_t *self = args[0];
     char *str;
     asprintf(&str, "\"%s\"", self->str_props->ob_sval->str);
     return new_str_internal(str);
 }
 
-object_t *str_cmp(object_t **args) {
-    if (args_len(args) != 2) {
-        set_exception("Needs two string arguments\n");
-        return NULL;
-    }
+object_t *str_cmp(object_t **args, int count) {
     object_t *self = args[0];
     object_t *other = args[1];
     return new_int_internal(strcmp(self->str_props->ob_sval->str, other->str_props->ob_sval->str));
 }
  
-object_t *str_hash(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("Needs a string argument\n");
-        return NULL;
-    }
+object_t *str_hash(object_t **args, int count) {
     object_t *self = args[0];
     return new_int_internal(g_str_hash(self->str_props->ob_sval->str));
 }
 
-object_t *str_getitem(object_t **args) {
+object_t *str_getitem(object_t **args, int count) {
     // TODO
-    if (args_len(args) != 2) {
-        set_exception("Needs two arguments\n");
-        return NULL;
-    }
     object_t *str = args[0];
     object_t *slice = args[1];
     if (slice->type == INT_TYPE) {
@@ -107,11 +87,10 @@ object_t *new_str_internal(char* value) {
 }
 
 void init_str() {
-    object_t *str_class = new_class(strdup("str"), NULL);
-    str_class->class_props->ob_func = new_str;
-    object_add_field(str_class, "__repr__", new_func(str_repr, strdup("__repr__")));
-    object_add_field(str_class, "__cmp__", new_func(str_cmp, strdup("__cmp__")));
-    object_add_field(str_class, "__hash__", new_func(str_hash, strdup("__hash__")));
-    object_add_field(str_class, "__getitem__", new_func(str_getitem, strdup("__getitem__")));
+    object_t *str_class = new_class(strdup("str"), NULL, new_str, 2);
+    object_add_field(str_class, "__repr__", new_func(str_repr, strdup("__repr__"), 1));
+    object_add_field(str_class, "__cmp__", new_func(str_cmp, strdup("__cmp__"), 2));
+    object_add_field(str_class, "__hash__", new_func(str_hash, strdup("__hash__"), 1));
+    object_add_field(str_class, "__getitem__", new_func(str_getitem, strdup("__getitem__"), 2));
     register_global(strdup("str"), str_class);
 }

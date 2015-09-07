@@ -1,11 +1,7 @@
 #include "slice.h"
 
-object_t *new_slice(object_t **args) {
+object_t *new_slice(object_t **args, int count) {
     printd("NEW SLICE\n");
-    if (args_len(args) != 4) {
-        set_exception("4 arguments expected\n");
-        return NULL;
-    }
     object_t *start = args[1];
     object_t *stop = args[2];
     object_t *step = args[3];
@@ -72,7 +68,6 @@ object_t *new_slice_internal(object_t *start, object_t *stop, object_t *step) {
 }
 
 void init_slice() {
-    object_t *slice_class = new_class(strdup("slice"), NULL);
-    slice_class->class_props->ob_func = new_slice;
+    object_t *slice_class = new_class(strdup("slice"), NULL, new_slice, 4);
     register_global(strdup("slice"), slice_class);
 }

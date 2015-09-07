@@ -10,6 +10,7 @@
 struct gen_thread_data_t {
     object_t **args;
     object_t *generator;
+    int count;
 };
 
 object_t *generator_runner(struct gen_thread_data_t *thread_data) {
@@ -44,7 +45,7 @@ pthread_setspecific(py_thread_key, p);
 // StopIterationException when exceptions get fully implemented
 }
 
-void generator_start(object_t *generator, object_t **args, object_t *run_func) {
+void generator_start(object_t *generator, object_t **args, int count) {
     struct gen_thread_data_t *thread_data = malloc(sizeof(struct gen_thread_data_t));
     GMutex *mutex = malloc(sizeof(GMutex));
     g_mutex_init(mutex);
@@ -55,6 +56,7 @@ void generator_start(object_t *generator, object_t **args, object_t *run_func) {
     generator->generatorfunc_props->cond = cond;
     generator->generatorfunc_props->mutex = mutex;
     thread_data->args = args;
+    thread_data->count = count;
     thread_data->generator = generator;
     generator->generatorfunc_props->ob_thread = g_thread_new("Python thread", generator_runner, thread_data);
     printd("waiting from generator creation (caller thread)\n");
@@ -63,12 +65,8 @@ void generator_start(object_t *generator, object_t **args, object_t *run_func) {
     g_mutex_unlock(mutex);
 }
 
-object_t *generator_next(object_t **args) {
+object_t *generator_next(object_t **args, int count) {
     printd("Started next\n");
-    if (args_len(args) != 1) {
-        set_exception("Expected one argument\n");
-        return NULL;
-    }
     object_t *generator = args[0];
     struct py_thread *thread = get_thread();
     struct GThread *gen_thread = generator->generatorfunc_props->ob_thread;
@@ -91,24 +89,24 @@ object_t *generator_next(object_t **args) {
     return result;
 }
 
-object_t *generator_iter(object_t **args) {
+object_t *generator_iter(object_t **args, int count) {
     object_t *generator = args[0];
     return generator;
 }
 
 static object_t *generator_class;
-object_t *new_generator_internal(object_t **args, object_t* run_func) {
+object_t *new_generator_internal(object_t **args, int count, atom_t* run_func) {
     object_t *generator = new_object(GENERATORFUNC_TYPE);
     generator->generatorfunc_props = malloc(sizeof(struct generatorfunc_type));
     generator->generatorfunc_props->ob_thread = NULL;
     generator->generatorfunc_props->ob_generatorfunc = run_func;
     generator->class = generator_class;
-    generator_start(generator, args, run_func);
+    generator_start(generator, args, count);
     return generator;
 }
 
 void init_generator() {
-    generator_class = new_class(strdup("generator"), NULL);
-    object_add_field(generator_class, "next", new_func(generator_next, strdup("next")));
-    object_add_field(generator_class, "__iter__", new_func(generator_iter, strdup("__iter__")));
+    generator_class = new_class(strdup("generator"), NULL, NULL, 0);
+    object_add_field(generator_class, "next", new_func(generator_next, strdup("next"), 1));
+    object_add_field(generator_class, "__iter__", new_func(generator_iter, strdup("__iter__"), 1));
 }

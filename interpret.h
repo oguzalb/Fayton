@@ -57,7 +57,8 @@ struct thread_type {
 };
 
 struct func_type {
-    struct _object *(*ob_func)(struct _object **);
+    struct _object *(*ob_func)(struct _object **, int);
+    int expected_args_count;
     char *name;
 };
 
@@ -80,8 +81,9 @@ struct generatorfunc_type {
 struct class_type {
 // TODO CHAIN
     struct _object **inherits;
-    struct _object *(*ob_func)(struct _object **);
+    struct _object *(*ob_func)(struct _object **, int);
     char *name;
+    int expected_args_count;
 };
 
 struct slice_type {
@@ -133,11 +135,11 @@ void print_var_each(gpointer, gpointer, gpointer);
 object_t *interpret_block(atom_t *, object_t **, int);
 object_t *interpret_funcblock(atom_t *, object_t **, int);
 void init_interpreter();
-object_t *new_func(object_t *(*)(object_t **), char *);
+object_t *new_func(object_t *(*)(object_t **, int), char *, int);
 void register_global(char*, object_t *);
 object_t *get_global(char*);
 object_t *get_global_no_check(char*);
-object_t *new_class(char*, object_t **);
+object_t *new_class(char*, object_t **, object_t *(*)(object_t **, int), int);
 int args_len(object_t **args);
 void print_var(char*, object_t*);
 #define set_exception(fmt, args...) \

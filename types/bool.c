@@ -31,20 +31,12 @@ object_t *new_bool_internal(object_t *object) {
     }
 }
 
-object_t* new_bool(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("one argument expected\n");
-        return NULL;
-    }
+object_t* new_bool(object_t **args, int count) {
     object_t *object = args[1];
     return new_bool_internal(object);
 }
 
-object_t *bool_repr_func(object_t **args) {
-    if (args_len(args) != 1) {
-        set_exception("one argument expected\n");
-        return NULL;
-    }
+object_t *bool_repr_func(object_t **args, int count) {
     static object_t *true_repr = NULL;
     static object_t *false_repr = NULL;
     object_t *self = args[0];
@@ -65,10 +57,9 @@ object_t *bool_repr_func(object_t **args) {
 }
 
 void init_bool() {
-    object_t *bool_class = new_class(strdup("bool"), NULL);
-    bool_class->class_props->ob_func = new_bool;
-    object_add_field(bool_class, "__eq__", new_func(object_equals, strdup("__eq__")));
-    object_add_field(bool_class, "__repr__", new_func(bool_repr_func, strdup("__repr__")));
+    object_t *bool_class = new_class(strdup("bool"), NULL, new_bool, 2);
+    object_add_field(bool_class, "__eq__", new_func(object_equals, strdup("__eq__"), 2));
+    object_add_field(bool_class, "__repr__", new_func(bool_repr_func, strdup("__repr__"), 1));
     register_global(strdup("bool"), bool_class);
 
     object_t *true_int = new_int_internal(TRUE);

@@ -78,31 +78,41 @@ void print_var(char* name, object_t* obj) {
         printd("obj %s %s\n", name, object_type_name(obj->type));
 }
 
-object_t *new_class(char* name, object_t **inherits) {
+object_t *new_class(char* name, object_t **inherits, object_t *(*func)(object_t **, int), int expected_args_count) {
     object_t *cls = g_hash_table_lookup(interpreter.globals, name);
-    if (cls != NULL) {
-        printd("This class already exists\n");
-        return NULL;
-    }
     printd("Creating the class %s\n", name);
     cls = new_object(CLASS_TYPE);
     cls->class_props = malloc(sizeof(struct class_type));
-    if (inherits == NULL) {
-        object_t *default_inherits[2] = {object_class, NULL};
-        inherits = default_inherits;
+    int count;
+    if (inherits == NULL)
+        count = 1;
+    else {
+        object_t **start = inherits;
+        while (*start != NULL) {
+            start++;
+        }
+        count = start - inherits;
     }
-    object_t **start = inherits;
-    while (*start != NULL) {
-        start++;
-    }
-    int count = start - inherits;
     cls->class_props->inherits = malloc((count + 1)*sizeof(object_t *));
-    int i = 0;
-    while (inherits[i] != NULL) {
-        cls->class_props->inherits[i++] = inherits[i];
+    if (inherits == NULL) {
+        cls->class_props->inherits[0] = object_class;
+        cls->class_props->inherits[1] = NULL;
+    } else {
+       int i = 0;
+        while (inherits[i] != NULL) {
+            cls->class_props->inherits[i++] = inherits[i];
+        }
+        cls->class_props->inherits[i] = NULL;
     }
-    cls->class_props->inherits[i] = NULL;
     cls->class_props->name = name;
+    cls->class_props->expected_args_count = expected_args_count;
+    if (func != NULL) {
+        object_add_field(cls, "__new__", new_func(func, strdup("__new__"), -1));
+    } else {
+        // TODO prevent multiple instance layouts
+        object_t *__new__ = object_get_field(cls->class_props->inherits[0], "__new__");
+        object_add_field(cls, "__new__", __new__);
+    }
     cls->class = NULL;
     return cls;
 }
@@ -161,11 +171,12 @@ object_t *get_global_no_check(char*name) {
     return g_hash_table_lookup(interpreter.globals, name);
 }
 
-object_t *new_func(object_t *(*func)(object_t **), char *name) {
+object_t *new_func(object_t *(*func)(object_t **, int), char *name, int expected_args_count) {
     object_t *func_obj = new_object(FUNC_TYPE);
     func_obj->func_props = malloc(sizeof(struct func_type));
     func_obj->func_props->ob_func = func;
     func_obj->func_props->name = name;
+    func_obj->func_props->expected_args_count = expected_args_count;
     func_obj->class = NULL;
     return func_obj;
 }
@@ -201,7 +212,7 @@ object_t *sum_func(object_t **args) {
     object_t *int_obj = NULL;
     object_t *next_params[2] = {iterator, NULL};
     do {
-        int_obj = object_call_func_obj(next_func, next_params);
+        int_obj = object_call_func_obj(next_func, next_params, 1);
         assert(int_obj != NULL?int_obj->type == INT_TYPE:TRUE);
         // TODO __add__
         if (int_obj != NULL)
@@ -221,7 +232,7 @@ object_t *range_func(object_t **args) {
         set_exception("Range parameters should be integer\n");
         return NULL;
     }
-    object_t *list = new_list(NULL);
+    object_t *list = new_list(NULL, 0);
     int i;
     for (i=min->int_props->ob_ival; i<max->int_props->ob_ival; i++) {
         list_append_internal(list, new_int_internal(i));
@@ -231,7 +242,7 @@ object_t *range_func(object_t **args) {
 
 object_t *print_func(object_t **args) {
     while (*args != NULL) {
-        object_t *obj_str = object_call_str(*args);
+        object_t *obj_str = object_call_str(args[0]);
         if (interpreter.error == RUN_ERROR)
             return NULL;
         printf("%s\n", obj_str->str_props->ob_sval->str);
@@ -276,8 +287,8 @@ void init_interpreter() {
     init_none();
     init_slice();
 
-    register_global(strdup("range"), new_func(range_func, strdup("range")));
-    register_global(strdup("sum"), new_func(sum_func, strdup("sum")));
+    register_global(strdup("range"), new_func(range_func, strdup("range"), -1));
+    register_global(strdup("sum"), new_func(sum_func, strdup("sum"), 1));
 
     init_list();
 
@@ -286,7 +297,7 @@ void init_interpreter() {
     init_thread();
     init_generator();
 
-    register_global(strdup("print"), new_func(print_func, strdup("print")));
+    register_global(strdup("print"), new_func(print_func, strdup("print"), -1));
 }
 
 int count_non_global_vars(GHashTable* context) {
@@ -334,6 +345,7 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
     }
  
     object_t **inner_args = NULL;
+    int inner_args_count = 0;
     if (func->type == USERFUNC_TYPE || func->type == GENERATORFUNC_TYPE) {
         atom_t *funcdef_atom;
         if (func->type == USERFUNC_TYPE)
@@ -343,24 +355,37 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
         inner_args = malloc(sizeof(object_t *) * (funcdef_atom->args_count + 1));
         memcpy(inner_args, funcdef_atom->args, sizeof(object_t *) * (funcdef_atom->args_count + 1));
     } else {
-        int inner_arg_count = 0;
         if (self != NULL && (func->type == FUNC_TYPE || func->type == CLASS_TYPE))
-            inner_arg_count++;
+            inner_args_count++;
 // builtins
 // TODO should be calculated once while parsing the call
         atom_t *param = func_call->child->next->child;
         while (param) {
-            inner_arg_count++;
+            inner_args_count++;
             param = param->next;
         }
-printd("builtin param_count calc %d\n", inner_arg_count);
-        inner_args = malloc((inner_arg_count + 1) * sizeof(object_t *));
-        inner_args[inner_arg_count] = NULL;
+        inner_args = malloc((inner_args_count + 1) * sizeof(object_t *));
+        inner_args[inner_args_count] = NULL;
+        int expected_args_count;
+        if (func->type == FUNC_TYPE)
+            expected_args_count = func->func_props->expected_args_count;
+        else if (func->type == CLASS_TYPE)
+            expected_args_count = func->class_props->expected_args_count;
+        else
+            assert(FALSE);
+        if (expected_args_count != -1 && inner_args_count != expected_args_count) {
+            if (func->type == FUNC_TYPE) {
+                set_exception("Argument count should be %d for %s, was %d\n", expected_args_count, func->func_props->name, inner_args_count);
+            } else if (func->type == CLASS_TYPE) {
+                set_exception("Argument count should be %d for %s, was %d\n", expected_args_count, func->class_props->name, inner_args_count);
+            }
+            return NULL;
+        }
     }
-    int param_index = 0;
-    if (self != NULL)
-        inner_args[param_index++] = self;
     if (func->type == FUNC_TYPE || func->type == CLASS_TYPE) {
+        int param_count = 0;
+        if (self != NULL)
+            inner_args[param_count++] = self;
         while (param) {
 // TODO kwargs should be supported for builtins
             object_t *value = interpret_expr(param, args, current_indent);
@@ -369,13 +394,16 @@ printd("builtin param_count calc %d\n", inner_arg_count);
             }
             printd("ADDING ARGUMENT %s\n", param->value);
             print_var("", value);
-            inner_args[param_index++] = value;
+            inner_args[param_count++] = value;
             param = param->next;
         }
     } else {
+        int param_count = 0;
         atom_t *param_name = func->userfunc_props->ob_userfunc->child->child;
-        if (func_call->child->type == A_ACCESSOR && interpreter.last_accessed != NULL)
+        if (self != NULL) {
             param_name = param_name->next;
+            inner_args[param_count++] = self;
+        }
         while (param && param_name && param_name->type == A_VAR) {
             object_t *value = interpret_expr(param, args, current_indent);
             if (interpreter.error == RUN_ERROR) {
@@ -383,10 +411,20 @@ printd("builtin param_count calc %d\n", inner_arg_count);
             }
             printd("ADDING ARGUMENT %s\n", param->value);
             print_var("", value);
-            inner_args[param_name->cl_index] = value;
+            inner_args[param_count++] = value;
             param = param->next;
             param_name = param_name->next;
         }
+        if (param != NULL && param_name == NULL) {
+            printd("param type %s\n", object_type_name(param->type));
+            set_exception("Too many params to %s\n", func->userfunc_props->name);
+            return NULL;
+        } else if (param == NULL && param_name != NULL && param_name->type == A_VAR) {
+            printd("param_name %s\n", param_name->value);
+            set_exception("More params needed for %s\n", func->userfunc_props->name);
+            return NULL;
+        }
+ 
         GHashTable *inner_kwargs = g_hash_table_new(g_str_hash, g_str_equal);
         atom_t *kwarg_name = param_name;
         // kwargs without names
@@ -411,23 +449,15 @@ printd("builtin param_count calc %d\n", inner_arg_count);
             g_hash_table_insert(inner_kwargs, param->value, value);
             param = param->next;
         }
+        inner_args_count = param_count;
         while (kwarg_name && kwarg_name->type == A_KWARG) {
             object_t *value = g_hash_table_lookup(inner_kwargs, kwarg_name->value);
             if (value == NULL)
                 value = g_hash_table_lookup(func->userfunc_props->kwargs, kwarg_name->value);
-            inner_args[param_index++] = value;
+            inner_args[param_count++] = value;
             kwarg_name = kwarg_name->next;
         }
         g_hash_table_destroy(inner_kwargs);
-        if (param != NULL) {
-            printd("param type %s\n", object_type_name(param->type));
-            set_exception("Too many params to %s\n", func->userfunc_props->name);
-            return NULL;
-        } else if (param_name != NULL && param_name->type == A_VAR) {
-            printd("param_name %s\n", param_name->value);
-            set_exception("More params needed for %s\n", func->userfunc_props->name);
-            return NULL;
-        }
         while (param_name && param_name->type == A_KWARG) param_name = param_name->next;
         if (param_name != NULL && param_name->type != A_CLOSURE) {
             assert(FALSE);
@@ -436,7 +466,7 @@ printd("builtin param_count calc %d\n", inner_arg_count);
     printd("calling func type %s\n", object_type_name(func->type));
     printd("ADDED PARAMS\n");
     struct py_thread *thread = get_thread();
-    char* func_name;
+    char *func_name;
     object_t *result;
     if (func->type == USERFUNC_TYPE) {
         func_name = strdup(func->userfunc_props->name);
@@ -445,16 +475,21 @@ printd("builtin param_count calc %d\n", inner_arg_count);
     } else if (func->type == GENERATORFUNC_TYPE) {
         func_name = strdup(func->generatorfunc_props->name);
         g_array_append_val(thread->stack_trace, func_name);
-        result = new_generator_internal(inner_args, func->generatorfunc_props->ob_generatorfunc);
+        result = new_generator_internal(inner_args, inner_args_count, func->generatorfunc_props->ob_generatorfunc);
     } else if (func->type == FUNC_TYPE) {
         func_name = strdup(func->func_props->name);
         g_array_append_val(thread->stack_trace, func_name);
-        result = func->func_props->ob_func(inner_args);
+        result = func->func_props->ob_func(inner_args, inner_args_count);
     } else if (func->type == CLASS_TYPE) {
         func_name = strdup(func->class_props->name);
         g_array_append_val(thread->stack_trace, func_name);
-        result = func->class_props->ob_func(inner_args);
-    }
+        result = object_call_func(func, inner_args, inner_args_count, "__new__");
+        // TODO this is a workaround, new should get class
+        result->class = func;
+        if (interpreter.error == RUN_ERROR)
+            return NULL;
+    } else
+        assert(FALSE);
     if (interpreter.error != RUN_ERROR) {
         g_array_remove_index(thread->stack_trace, thread->stack_trace->len - 1);
         free(func_name);
@@ -481,7 +516,7 @@ object_t *interpret_list(atom_t *expr, object_t **args, int current_indent) {
 }
 
 object_t *interpret_dict(atom_t *expr, object_t **args, int current_indent) {
-    object_t *dict = new_dict(NULL);
+    object_t *dict = new_dict(NULL, 0);
     atom_t *elem = expr->child;
     while (elem != NULL) {
         object_t *key = interpret_expr(elem, args, current_indent);
@@ -676,9 +711,9 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
             object_t *set_attr = object_get_field_no_check(object, "__setattr__");
             if (set_attr != NULL) {
                 printd("%p object has __setattr__\n", object);
-                object_t *field_name = new_str(left_var->child->next->value);
-                object_t *params = {object, field_name, result, NULL};
-                object_call_func_obj(set_attr, params);
+                object_t *field_name = new_str_internal(left_var->child->next->value);
+                object_t *params[4] = {object, field_name, result, NULL};
+                object_call_func_obj(set_attr, params, 3);
             } else {
                 printd("%p object does not have __setattr__\n", object);
                 object_set_field(object, left_var->child->next->value, result);
@@ -706,7 +741,7 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
             return NULL;
         object_t *params[2] = {iterator, NULL};
         object_t *item;
-        while(item = object_call_func_obj(next_func, params)) {
+        while(item = object_call_func_obj(next_func, params, 1)) {
             if (interpreter.error == RUN_ERROR)
                 return NULL;
             if (var_name->type == A_TUPLE) {
@@ -719,7 +754,7 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
                 object_t *next_params[2] = {tuple_it, NULL};
                 object_t *tuple_item;
                 atom_t *tuple_item_name = var_name->child;
-                while ((tuple_item = object_call_func_obj(next_func, next_params)) && tuple_item_name != NULL) {
+                while ((tuple_item = object_call_func_obj(next_func, next_params, 1)) && tuple_item_name != NULL) {
                     if (interpreter.error == RUN_ERROR)
                         return NULL;
                     if (tuple_item_name->type != A_VAR) {
@@ -776,7 +811,7 @@ printd("A_WHILE\n");
         while (inherits != NULL) {count++; inherits = inherits->next;}
         object_t *class;
         if (count == 0) {
-            class = new_class(strdup(class_name->value), NULL);
+            class = new_class(strdup(class_name->value), NULL, NULL, -1);
         } else {
             object_t *param_inherits[count+1];
             inherits = stmt->child->child;
@@ -791,9 +826,9 @@ printd("A_WHILE\n");
                 inherits = inherits->next;
             }
             param_inherits[i] = NULL;
-            class = new_class(strdup(class_name->value), param_inherits);
+printf("initializing class with parents\n");
+            class = new_class(strdup(class_name->value), param_inherits, NULL, -1);
         }
-        class->class_props->ob_func = new_object_instance;
         atom_t *field = stmt->child->next;
         while (field) {
             if (field->type == A_FUNCDEF) {
@@ -825,6 +860,8 @@ printd("A_WHILE\n");
                 prepare_func_args(generatorfunc, args, current_indent);
             } else if (field->type == A_VAR) {
                 object_t *result = interpret_expr(field->child, args, current_indent);
+                if (interpreter.error == RUN_ERROR)
+                    return NULL;
                 object_add_field(class, field->value, result);
                 printd("added class field %s.%s\n", class_name->value, field->value);
             } else {

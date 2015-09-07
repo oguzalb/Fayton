@@ -306,7 +306,7 @@ int main () {
 "def add(a, b):\n\
     return a + b",
 "BLOCK:block\n\
-  FUNCDEF:add\n\
+  FUNCDEF:add:-1\n\
     FREEVARS:\n\
       a:0\n\
       b:1\n\
@@ -349,10 +349,10 @@ int main () {
         return self.value + other\n\
     value = 10\n",
 "BLOCK:block\n\
-  CLASS:Hede\n\
+  CLASS:Hede:-1\n\
     PARAMS:params\n\
       VAR:object:-1\n\
-    FUNCDEF:__add__\n\
+    FUNCDEF:__add__:-1\n\
       FREEVARS:\n\
         other:1\n\
         self:0\n\
@@ -482,7 +482,7 @@ else:\n\
         INTEGER:1\n", &tree);
     test_parse_block("def func():\n\    yield a", 
 "BLOCK:block\n\
-  GENFUNCDEF:func\n\
+  GENFUNCDEF:func:-1\n\
     FREEVARS:\n\
     PARAMS:params\n\
     BLOCK:block\n\
@@ -490,7 +490,7 @@ else:\n\
         VAR:a:-1\n", &tree);
     test_parse_block("def func():\n\    while True:\n\        yield a", 
 "BLOCK:block\n\
-  GENFUNCDEF:func\n\
+  GENFUNCDEF:func:-1\n\
     FREEVARS:\n\
     PARAMS:params\n\
     BLOCK:block\n\
@@ -501,12 +501,12 @@ else:\n\
             VAR:a:-1\n", &tree);
     test_parse_block("def func():\n\    def func2():\n\        yield a\n\    return 1",
 "BLOCK:block\n\
-  FUNCDEF:func\n\
+  FUNCDEF:func:-1\n\
     FREEVARS:\n\
       func2:0\n\
     PARAMS:params\n\
     BLOCK:block\n\
-      GENFUNCDEF:func2\n\
+      GENFUNCDEF:func2:0\n\
         FREEVARS:\n\
         PARAMS:params\n\
         BLOCK:block\n\
@@ -549,7 +549,7 @@ else:\n\
         yield a\n\
         yield b",
 "BLOCK:block\n\
-  FUNCDEF:func\n\
+  FUNCDEF:func:-1\n\
     FREEVARS:\n\
       func2:1\n\
       a:0\n\
@@ -558,7 +558,7 @@ else:\n\
       ASSIGNMENT:=\n\
         VAR:a:0\n\
         INTEGER:5\n\
-      GENFUNCDEF:func2\n\
+      GENFUNCDEF:func2:1\n\
         FREEVARS:\n\
           a:0\n\
         PARAMS:params\n\
@@ -588,9 +588,9 @@ else:\n\
 c = Cat()\n\
 print(c.value)",
 "BLOCK:block\n\
-  CLASS:Cat\n\
+  CLASS:Cat:-1\n\
     PARAMS:params\n\
-    FUNCDEF:__init__\n\
+    FUNCDEF:__init__:-1\n\
       FREEVARS:\n\
         value:1\n\
         self:0\n\
