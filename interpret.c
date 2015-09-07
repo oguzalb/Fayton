@@ -121,7 +121,7 @@ object_t *lookup_var(object_t **args, atom_t *var) {
     if (var->cl_index == -1) {
         obj = g_hash_table_lookup(interpreter.globals, var->value);
         printd("var search from globals\n");
-    } else if (args != NULL && var->cl_index < args_len(args)){
+    } else if (args != NULL){
         obj = args[var->cl_index];
         printd("var search from locals\n");
     }
@@ -130,7 +130,7 @@ object_t *lookup_var(object_t **args, atom_t *var) {
         if (var->cl_index == -1) {
             set_exception("Global not found |%s|\n", var->value);
         } else {
-            set_exception("Local not found!!!|%s| arglen: %d\n", var->value, (sizeof(args) / sizeof(object_t *)));
+            set_exception("Local not found!!!|%s|\n", var->value);
         }
         return NULL;
     }
@@ -298,7 +298,7 @@ int count_non_global_vars(GHashTable* context) {
         char *key = _key;
         freevar_t *var = value;
         if (var->cl_index != -1) {
-printf("counting %d %d\n", var->type, var->cl_index);
+            printd("counting non_global var %d %d\n", var->type, var->cl_index);
             count++;
         }
     }
@@ -341,7 +341,6 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
         else
             funcdef_atom = func->generatorfunc_props->ob_generatorfunc;
         inner_args = malloc(sizeof(object_t *) * (funcdef_atom->args_count + 1));
-printf("p:  %p\n", funcdef_atom->args);
         memcpy(inner_args, funcdef_atom->args, sizeof(object_t *) * (funcdef_atom->args_count + 1));
     } else {
         int inner_arg_count = 0;
@@ -583,7 +582,6 @@ object_t *interpret_expr(atom_t *expr, object_t **args, int current_indent) {
         object_t *object;
         if (expr->child->type == A_VAR) {
             printd("%s\n", expr->child->value);
-printf("ARGS START %p\n", args);
             object = lookup_var(args, expr->child);
             if (interpreter.error == RUN_ERROR) {
                 return NULL;
@@ -614,6 +612,49 @@ printf("ARGS START %p\n", args);
     }
 }
 
+void prepare_func_args(object_t *func, object_t **args, int current_indent) {
+    atom_t *funcdef;
+    if (func->type == USERFUNC_TYPE)
+        funcdef = func->userfunc_props->ob_userfunc;
+    else if (func->type == GENERATORFUNC_TYPE)
+        funcdef = func->generatorfunc_props->ob_generatorfunc;
+    else
+        assert(FALSE);
+    int args_count = g_hash_table_size(funcdef->context);
+    printd("(user/generator)func args_count %d\n", args_count);
+    funcdef->args = malloc(sizeof(object_t *) * (args_count + 1));
+    memset(funcdef->args, 0, sizeof(object_t *) * (args_count + 1));
+    funcdef->args[args_count] = NULL;
+    funcdef->args_count = args_count;
+    int param_index = 0;
+    atom_t *param_name = funcdef->child->child;
+    while (param_name != NULL && param_name->type == A_VAR) {
+        param_index++;
+        param_name = param_name->next;
+    }
+    printd("Binding kwargs\n");
+    while (param_name != NULL && param_name->type == A_KWARG) {
+        printd("Binding default kwarg %s to %d\n", param_name->value, param_index);
+        atom_t *value_expr = param_name->child;
+        object_t *def_val = interpret_expr(value_expr, args, current_indent);
+        funcdef->args[param_index++] = def_val;
+        param_name = param_name->next;
+    }
+    while (param_name != NULL && param_name->type == A_KWARG) {
+        param_index++;
+        param_name = param_name->next;
+    }
+    printd("binding closures\n");
+    while (param_name != NULL) {
+        printd("Binding closure %p %s %d to %d\n", args[param_name->cl_index], param_name->value, param_name->cl_index, param_index);
+        assert(param_name->cl_index < args_count);
+        //printd("binding arg %d as %s %d\n", closure_name->cl_index, closure_name->value, param_index);
+        object_t *arg = args[param_name->cl_index];
+        funcdef->args[param_index++] = arg;
+        param_name = param_name->next;
+    }
+}
+
 object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
     if (stmt->type == A_FUNCCALL) {
         interpret_expr(stmt, args, current_indent);
@@ -630,14 +671,16 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
 
         if (left_var->type == A_ACCESSOR) {
             object_t *object = interpret_expr(left_var->child, args, current_indent);
+            if (interpreter.error == RUN_ERROR)
+                return NULL;
             object_t *set_attr = object_get_field_no_check(object, "__setattr__");
             if (set_attr != NULL) {
-                printf("%p object has __setattr__\n", object);
+                printd("%p object has __setattr__\n", object);
                 object_t *field_name = new_str(left_var->child->next->value);
                 object_t *params = {object, field_name, result, NULL};
                 object_call_func_obj(set_attr, params);
             } else {
-                printf("%p object does not have __setattr__\n", object);
+                printd("%p object does not have __setattr__\n", object);
                 object_set_field(object, left_var->child->next->value, result);
             }
         } else {
@@ -647,9 +690,6 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
         return NULL;
     } else if (stmt->type == A_FOR) {
         atom_t *var_name = stmt->child;
-        //object_t *var = get_global(interpreter, var_name->value);
-        //if (var == NULL)
-        //    return;
         atom_t *expr = var_name->next;
         object_t *iterable = interpret_expr(expr, args, current_indent);
         if (interpreter.error == RUN_ERROR)
@@ -723,51 +763,12 @@ printd("A_WHILE\n");
             }
         }
         object_t *userfunc = new_user_func(stmt, strdup(stmt->value), kwargs);
-        int args_count = g_hash_table_size(userfunc->userfunc_props->ob_userfunc->context);
-        printd("userfunc args_count %d\n", args_count);
-        userfunc->userfunc_props->ob_userfunc->args = malloc(sizeof(object_t *) * (args_count + 1));
-        memset(userfunc->userfunc_props->ob_userfunc->args, 0, sizeof(object_t *) * (args_count + 1));
-        userfunc->userfunc_props->ob_userfunc->args[args_count] = NULL;
-printf("p:  %p\n", userfunc->userfunc_props->ob_userfunc->args);
-        userfunc->userfunc_props->ob_userfunc->args_count = args_count;
-        printd("binding closures\n");
-        int param_index = 0;
-        atom_t *closure_name = userfunc->userfunc_props->ob_userfunc->child->child;
-        while (closure_name != NULL && closure_name->type != A_CLOSURE) {
-            param_index++;
-            closure_name = closure_name->next;
-        }
-        while (closure_name != NULL) {
-            assert(closure_name->cl_index < args_count);
-            //printd("binding arg %d as %s %d\n", closure_name->cl_index, closure_name->value, param_index);
-            object_t *arg = args[closure_name->cl_index];
-            userfunc->userfunc_props->ob_userfunc->args[param_index++] = arg;
-            closure_name = closure_name->next;
-        }
         set_var(args, stmt, userfunc);
+        prepare_func_args(userfunc, args, current_indent);
     } else if (stmt->type == A_GENFUNCDEF) {
         object_t *generatorfunc = new_generator_func(stmt, strdup(stmt->value));
         set_var(args, stmt, generatorfunc);
-        int args_count = g_hash_table_size(generatorfunc->generatorfunc_props->ob_generatorfunc->context);
-        printd("generatorfunc args_count %d\n", args_count);
-        generatorfunc->generatorfunc_props->ob_generatorfunc->args = malloc(sizeof(object_t *) * (args_count + 1));
-        memset(generatorfunc->generatorfunc_props->ob_generatorfunc->args, 0, sizeof(object_t *) * (args_count + 1));
-        generatorfunc->generatorfunc_props->ob_generatorfunc->args[args_count] = NULL;
-printf("p:  %p\n", generatorfunc->generatorfunc_props->ob_generatorfunc->args);
-        generatorfunc->generatorfunc_props->ob_generatorfunc->args_count = args_count;
-        printd("binding closures\n");
-        int param_index = 0;
-        atom_t *closure_name = generatorfunc->generatorfunc_props->ob_generatorfunc->child->child;
-        while (closure_name != NULL && closure_name->type != A_CLOSURE) {
-            param_index++;
-            closure_name = closure_name->next;
-        }
-        while (closure_name != NULL) {
-            assert(closure_name->cl_index < args_count);
-            object_t *arg = args[closure_name->cl_index];
-            generatorfunc->generatorfunc_props->ob_generatorfunc->args[param_index++] = arg;
-            closure_name = closure_name->next;
-        }
+        prepare_func_args(generatorfunc, args, current_indent);
     } else if (stmt->type == A_CLASS) {
         atom_t *class_name = stmt;
         atom_t *inherits = stmt->child->child;
@@ -815,52 +816,13 @@ printf("p:  %p\n", generatorfunc->generatorfunc_props->ob_generatorfunc->args);
                 object_t *userfunc = new_user_func(field, trace_str, kwargs);
                 object_add_field(class, field->value, userfunc);
                 printd("added class field func %s.%s\n", class_name->value, field->value);
-                int args_count = g_hash_table_size(userfunc->userfunc_props->ob_userfunc->context);
-                printd("userfunc args_count %d\n", args_count);
-                userfunc->userfunc_props->ob_userfunc->args = malloc(sizeof(object_t *) * (args_count + 1));
-                memset(userfunc->userfunc_props->ob_userfunc->args, 0, sizeof(object_t *) * (args_count + 1));
-                userfunc->userfunc_props->ob_userfunc->args[args_count] = NULL;
-printf("p:  %p\n", userfunc->userfunc_props->ob_userfunc->args);
-                userfunc->userfunc_props->ob_userfunc->args_count = args_count;
-                printd("binding closures\n");
-                int param_index = 0;
-                atom_t *closure_name = userfunc->userfunc_props->ob_userfunc->child->child;
-                while (closure_name != NULL && closure_name->type != A_CLOSURE) {
-                    param_index++;
-                    closure_name = closure_name->next;
-                }
-                while (closure_name != NULL) {
-                    assert(closure_name->cl_index < args_count);
-                    object_t *arg = args[closure_name->cl_index];
-                    userfunc->userfunc_props->ob_userfunc->args[param_index++] = arg;
-                    closure_name = closure_name->next;
-                }    
- 
+                prepare_func_args(userfunc, args, current_indent);
             } else if (field->type == A_GENFUNCDEF) {
                 char *trace_str;
                 asprintf(&trace_str, "%s.%s", class_name->value, field->value);
                 object_t *generatorfunc = new_generator_func(field, trace_str);
                 object_add_field(class, field->value, generatorfunc);
-                int args_count = g_hash_table_size(generatorfunc->generatorfunc_props->ob_generatorfunc->context);
-                printd("generatorfunc args_count %d\n", args_count);
-                generatorfunc->generatorfunc_props->ob_generatorfunc->args = malloc(sizeof(object_t *) * (args_count + 1));
-                memset(generatorfunc->generatorfunc_props->ob_generatorfunc->args, 0, sizeof(object_t *) * (args_count + 1));
-                generatorfunc->generatorfunc_props->ob_generatorfunc->args[args_count] = NULL;
-printf("p:  %p\n", generatorfunc->generatorfunc_props->ob_generatorfunc->args);
-                generatorfunc->generatorfunc_props->ob_generatorfunc->args_count = args_count;
-                printd("binding closures\n");
-                int param_index = 0;
-                atom_t *closure_name = generatorfunc->generatorfunc_props->ob_generatorfunc->child->child;
-                while (closure_name != NULL && closure_name->type != A_CLOSURE) {
-                    param_index++;
-                    closure_name = closure_name->next;
-                }
-                while (closure_name != NULL) {
-                    assert(closure_name->cl_index < args_count);
-                    object_t *arg = args[closure_name->cl_index];
-                    generatorfunc->generatorfunc_props->ob_generatorfunc->args[param_index++] = arg;
-                    closure_name = closure_name->next;
-                }
+                prepare_func_args(generatorfunc, args, current_indent);
             } else if (field->type == A_VAR) {
                 object_t *result = interpret_expr(field->child, args, current_indent);
                 object_add_field(class, field->value, result);

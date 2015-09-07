@@ -92,22 +92,22 @@ void test_parse_block(char* code, char* expect, atom_tree_t *tree) {
 int main () {
     static char buffer[] = "a+b+(c*3)";
     atom_tree_t tree;
-    test_parse_func_basic("a", "VAR:a\n", &tree, parse_power);
+    test_parse_func_basic("a", "VAR:a:-1\n", &tree, parse_power);
     test_parse_func_basic("1", "INTEGER:1\n", &tree, parse_power);
     test_parse_func_basic("\"hahaha\"", "STRING:hahaha\n", &tree, parse_power);
     test_parse_func_basic("a.b.c",
 "ACCESSOR:.\n\
   ACCESSOR:.\n\
-    VAR:a\n\
-    VAR:b\n\
-  VAR:c\n", &tree, parse_power);
+    VAR:a:-1\n\
+    VAR:b:-1\n\
+  VAR:c:-1\n", &tree, parse_power);
     test_parse_func_basic("a.b.c()",
 "FUNCCALL:()call\n\
   ACCESSOR:.\n\
     ACCESSOR:.\n\
-      VAR:a\n\
-      VAR:b\n\
-    VAR:c\n\
+      VAR:a:-1\n\
+      VAR:b:-1\n\
+    VAR:c:-1\n\
   PARAMS:params\n", &tree, parse_power);
     test_parse_func_basic("a.b.c().d()",
 "FUNCCALL:()call\n\
@@ -115,24 +115,24 @@ int main () {
     FUNCCALL:()call\n\
       ACCESSOR:.\n\
         ACCESSOR:.\n\
-          VAR:a\n\
-          VAR:b\n\
-        VAR:c\n\
+          VAR:a:-1\n\
+          VAR:b:-1\n\
+        VAR:c:-1\n\
       PARAMS:params\n\
-    VAR:d\n\
+    VAR:d:-1\n\
   PARAMS:params\n", &tree, parse_power);
     test_parse_func_basic("a*b*c",
 "FUNCCALL:()call\n\
   ACCESSOR:.\n\
     FUNCCALL:()call\n\
       ACCESSOR:.\n\
-        VAR:a\n\
-        VAR:__mul__\n\
+        VAR:a:-1\n\
+        VAR:__mul__:-1\n\
       PARAMS:params\n\
-        VAR:b\n\
-    VAR:__mul__\n\
+        VAR:b:-1\n\
+    VAR:__mul__:-1\n\
   PARAMS:params\n\
-    VAR:c\n", &tree, parse_term);
+    VAR:c:-1\n", &tree, parse_term);
     test_parse_func_basic("a.b()*d()/a",
 "FUNCCALL:()call\n\
   ACCESSOR:.\n\
@@ -140,39 +140,39 @@ int main () {
       ACCESSOR:.\n\
         FUNCCALL:()call\n\
           ACCESSOR:.\n\
-            VAR:a\n\
-            VAR:b\n\
+            VAR:a:-1\n\
+            VAR:b:-1\n\
           PARAMS:params\n\
-        VAR:__mul__\n\
+        VAR:__mul__:-1\n\
       PARAMS:params\n\
         FUNCCALL:()call\n\
-          VAR:d\n\
+          VAR:d:-1\n\
           PARAMS:params\n\
-    VAR:__div__\n\
+    VAR:__div__:-1\n\
   PARAMS:params\n\
-    VAR:a\n", &tree, parse_term);
+    VAR:a:-1\n", &tree, parse_term);
     test_parse_func_basic("a+b",
 "FUNCCALL:()call\n\
   ACCESSOR:.\n\
-    VAR:a\n\
-    VAR:__add__\n\
+    VAR:a:-1\n\
+    VAR:__add__:-1\n\
   PARAMS:params\n\
-    VAR:b\n", &tree, parse_arith);
+    VAR:b:-1\n", &tree, parse_arith);
     test_parse_func_basic("a+b*c-3",
 "FUNCCALL:()call\n\
   ACCESSOR:.\n\
     FUNCCALL:()call\n\
       ACCESSOR:.\n\
-        VAR:a\n\
-        VAR:__add__\n\
+        VAR:a:-1\n\
+        VAR:__add__:-1\n\
       PARAMS:params\n\
         FUNCCALL:()call\n\
           ACCESSOR:.\n\
-            VAR:b\n\
-            VAR:__mul__\n\
+            VAR:b:-1\n\
+            VAR:__mul__:-1\n\
           PARAMS:params\n\
-            VAR:c\n\
-    VAR:__sub__\n\
+            VAR:c:-1\n\
+    VAR:__sub__:-1\n\
   PARAMS:params\n\
     INTEGER:3\n", &tree, parse_arith);
     test_parse_func_basic("a<<b+c<<3",
@@ -180,127 +180,127 @@ int main () {
   ACCESSOR:.\n\
     FUNCCALL:()call\n\
       ACCESSOR:.\n\
-        VAR:a\n\
-        VAR:__lshift__\n\
+        VAR:a:-1\n\
+        VAR:__lshift__:-1\n\
       PARAMS:params\n\
         FUNCCALL:()call\n\
           ACCESSOR:.\n\
-            VAR:b\n\
-            VAR:__add__\n\
+            VAR:b:-1\n\
+            VAR:__add__:-1\n\
           PARAMS:params\n\
-            VAR:c\n\
-    VAR:__rshift__\n\
+            VAR:c:-1\n\
+    VAR:__rshift__:-1\n\
   PARAMS:params\n\
     INTEGER:3\n", &tree, parse_shift);
     test_parse_func_basic("func(a,1,1)",
 "FUNCCALL:()call\n\
-  VAR:func\n\
+  VAR:func:-1\n\
   PARAMS:params\n\
-    VAR:a\n\
+    VAR:a:-1\n\
     INTEGER:1\n\
     INTEGER:1\n", &tree, parse_shift);
     test_parse_func_basic("func(a+1, b+5, (c+3)*4)",
 "FUNCCALL:()call\n\
-  VAR:func\n\
+  VAR:func:-1\n\
   PARAMS:params\n\
     FUNCCALL:()call\n\
       ACCESSOR:.\n\
-        VAR:a\n\
-        VAR:__add__\n\
+        VAR:a:-1\n\
+        VAR:__add__:-1\n\
       PARAMS:params\n\
         INTEGER:1\n\
     FUNCCALL:()call\n\
       ACCESSOR:.\n\
-        VAR:b\n\
-        VAR:__add__\n\
+        VAR:b:-1\n\
+        VAR:__add__:-1\n\
       PARAMS:params\n\
         INTEGER:5\n\
     FUNCCALL:()call\n\
       ACCESSOR:.\n\
         FUNCCALL:()call\n\
           ACCESSOR:.\n\
-            VAR:c\n\
-            VAR:__add__\n\
+            VAR:c:-1\n\
+            VAR:__add__:-1\n\
           PARAMS:params\n\
             INTEGER:3\n\
-        VAR:__mul__\n\
+        VAR:__mul__:-1\n\
       PARAMS:params\n\
         INTEGER:4\n", &tree, parse_expr);
     test_parse_func_basic("f1(f2(a+3), 7, f3(a+b*5))",
 "FUNCCALL:()call\n\
-  VAR:f1\n\
+  VAR:f1:-1\n\
   PARAMS:params\n\
     FUNCCALL:()call\n\
-      VAR:f2\n\
+      VAR:f2:-1\n\
       PARAMS:params\n\
         FUNCCALL:()call\n\
           ACCESSOR:.\n\
-            VAR:a\n\
-            VAR:__add__\n\
+            VAR:a:-1\n\
+            VAR:__add__:-1\n\
           PARAMS:params\n\
             INTEGER:3\n\
     INTEGER:7\n\
     FUNCCALL:()call\n\
-      VAR:f3\n\
+      VAR:f3:-1\n\
       PARAMS:params\n\
         FUNCCALL:()call\n\
           ACCESSOR:.\n\
-            VAR:a\n\
-            VAR:__add__\n\
+            VAR:a:-1\n\
+            VAR:__add__:-1\n\
           PARAMS:params\n\
             FUNCCALL:()call\n\
               ACCESSOR:.\n\
-                VAR:b\n\
-                VAR:__mul__\n\
+                VAR:b:-1\n\
+                VAR:__mul__:-1\n\
               PARAMS:params\n\
                 INTEGER:5\n", &tree, parse_expr);
     test_parse_block("a = int(1)\nb = a + 2",
 "BLOCK:block\n\
   ASSIGNMENT:=\n\
-    VAR:a\n\
+    VAR:a:-1\n\
     FUNCCALL:()call\n\
-      VAR:int\n\
+      VAR:int:-1\n\
       PARAMS:params\n\
         INTEGER:1\n\
   ASSIGNMENT:=\n\
-    VAR:b\n\
+    VAR:b:-1\n\
     FUNCCALL:()call\n\
       ACCESSOR:.\n\
-        VAR:a\n\
-        VAR:__add__\n\
+        VAR:a:-1\n\
+        VAR:__add__:-1\n\
       PARAMS:params\n\
         INTEGER:2\n", &tree);
     test_parse_block("for i in range(1,10):\n    print(i)",
 "BLOCK:block\n\
   FOR:FOR\n\
-    VAR:i\n\
+    VAR:i:-1\n\
     FUNCCALL:()call\n\
-      VAR:range\n\
+      VAR:range:-1\n\
       PARAMS:params\n\
         INTEGER:1\n\
         INTEGER:10\n\
     BLOCK:block\n\
       FUNCCALL:()call\n\
-        VAR:print\n\
+        VAR:print:-1\n\
         PARAMS:params\n\
-          VAR:i\n", &tree);
+          VAR:i:-1\n", &tree);
     test_parse_block("for i, j in range(1,10):\n    print(i, j)",
 "BLOCK:block\n\
   FOR:FOR\n\
     TUPLE:tuple\n\
-      VAR:i\n\
-      VAR:j\n\
+      VAR:i:-1\n\
+      VAR:j:-1\n\
     FUNCCALL:()call\n\
-      VAR:range\n\
+      VAR:range:-1\n\
       PARAMS:params\n\
         INTEGER:1\n\
         INTEGER:10\n\
     BLOCK:block\n\
       FUNCCALL:()call\n\
-        VAR:print\n\
+        VAR:print:-1\n\
         PARAMS:params\n\
-          VAR:i\n\
-          VAR:j\n", &tree);
+          VAR:i:-1\n\
+          VAR:j:-1\n", &tree);
 
     test_parse_block(
 "def add(a, b):\n\
@@ -311,20 +311,20 @@ int main () {
       a:0\n\
       b:1\n\
     PARAMS:params\n\
-      VAR:a\n\
-      VAR:b\n\
+      VAR:a:0\n\
+      VAR:b:1\n\
     BLOCK:block\n\
       RETURN:return\n\
         FUNCCALL:()call\n\
           ACCESSOR:.\n\
-            VAR:a\n\
-            VAR:__add__\n\
+            VAR:a:0\n\
+            VAR:__add__:-1\n\
           PARAMS:params\n\
-            VAR:b\n", &tree);
+            VAR:b:1\n", &tree);
     test_parse_block("a = [1, 2, 3, 4]", 
 "BLOCK:block\n\
   ASSIGNMENT:=\n\
-    VAR:a\n\
+    VAR:a:-1\n\
     LIST:list\n\
       INTEGER:1\n\
       INTEGER:2\n\
@@ -333,7 +333,7 @@ int main () {
     test_parse_block("a = {1:5, 2:6, 3:7, 4:8}",
 "BLOCK:block\n\
   ASSIGNMENT:=\n\
-    VAR:a\n\
+    VAR:a:-1\n\
     DICTIONARY:dict\n\
       INTEGER:1\n\
       INTEGER:5\n\
@@ -351,25 +351,25 @@ int main () {
 "BLOCK:block\n\
   CLASS:Hede\n\
     PARAMS:params\n\
-      VAR:object\n\
+      VAR:object:-1\n\
     FUNCDEF:__add__\n\
       FREEVARS:\n\
         other:1\n\
         self:0\n\
       PARAMS:params\n\
-        VAR:self\n\
-        VAR:other\n\
+        VAR:self:0\n\
+        VAR:other:1\n\
       BLOCK:block\n\
         RETURN:return\n\
           FUNCCALL:()call\n\
             ACCESSOR:.\n\
               ACCESSOR:.\n\
-                VAR:self\n\
-                VAR:value\n\
-              VAR:__add__\n\
+                VAR:self:0\n\
+                VAR:value:-1\n\
+              VAR:__add__:-1\n\
             PARAMS:params\n\
-              VAR:other\n\
-    VAR:value\n\
+              VAR:other:1\n\
+    VAR:value:-1\n\
       INTEGER:10\n", &tree);
     test_parse_block(
 "a = 5\n\
@@ -381,7 +381,7 @@ else:\n\
     print(\"a * 3 equals to 9\")\n", 
 "BLOCK:block\n\
   ASSIGNMENT:=\n\
-    VAR:a\n\
+    VAR:a:-1\n\
     INTEGER:5\n\
   IF:if\n\
     FUNCCALL:()call\n\
@@ -390,19 +390,19 @@ else:\n\
           ACCESSOR:.\n\
             FUNCCALL:()call\n\
               ACCESSOR:.\n\
-                VAR:a\n\
-                VAR:__mul__\n\
+                VAR:a:-1\n\
+                VAR:__mul__:-1\n\
               PARAMS:params\n\
                 INTEGER:3\n\
-            VAR:__cmp__\n\
+            VAR:__cmp__:-1\n\
           PARAMS:params\n\
             INTEGER:8\n\
-        VAR:__eq__\n\
+        VAR:__eq__:-1\n\
       PARAMS:params\n\
         INTEGER:1\n\
     BLOCK:block\n\
       FUNCCALL:()call\n\
-        VAR:print\n\
+        VAR:print:-1\n\
         PARAMS:params\n\
           STRING:a * 3 is greater than 8\n\
     FUNCCALL:()call\n\
@@ -411,34 +411,34 @@ else:\n\
           ACCESSOR:.\n\
             FUNCCALL:()call\n\
               ACCESSOR:.\n\
-                VAR:a\n\
-                VAR:__mul__\n\
+                VAR:a:-1\n\
+                VAR:__mul__:-1\n\
               PARAMS:params\n\
                 INTEGER:3\n\
-            VAR:__cmp__\n\
+            VAR:__cmp__:-1\n\
           PARAMS:params\n\
             INTEGER:8\n\
-        VAR:__eq__\n\
+        VAR:__eq__:-1\n\
       PARAMS:params\n\
         INTEGER:-1\n\
     BLOCK:block\n\
       FUNCCALL:()call\n\
-        VAR:print\n\
+        VAR:print:-1\n\
         PARAMS:params\n\
           STRING:a * 3 is smaller than 8\n\
     BLOCK:block\n\
       FUNCCALL:()call\n\
-        VAR:print\n\
+        VAR:print:-1\n\
         PARAMS:params\n\
           STRING:a * 3 equals to 9\n", &tree);
     test_parse_func_basic("l[1:3:2]",
 "FUNCCALL:()call\n\
   ACCESSOR:.\n\
-    VAR:l\n\
-    VAR:__getitem__\n\
+    VAR:l:-1\n\
+    VAR:__getitem__:-1\n\
   PARAMS:params\n\
     FUNCCALL:slicecall\n\
-      VAR:slice\n\
+      VAR:slice:-1\n\
       PARAMS:params\n\
         INTEGER:1\n\
         INTEGER:3\n\
@@ -446,38 +446,38 @@ else:\n\
     test_parse_func_basic("l[::]",
 "FUNCCALL:()call\n\
   ACCESSOR:.\n\
-    VAR:l\n\
-    VAR:__getitem__\n\
+    VAR:l:-1\n\
+    VAR:__getitem__:-1\n\
   PARAMS:params\n\
     FUNCCALL:slicecall\n\
-      VAR:slice\n\
+      VAR:slice:-1\n\
       PARAMS:params\n\
-        VAR:None\n\
-        VAR:None\n\
-        VAR:None\n", &tree, parse_expr); 
+        VAR:None:-1\n\
+        VAR:None:-1\n\
+        VAR:None:-1\n", &tree, parse_expr); 
 
     test_parse_block("d = a.b.c[1:2:3][1]", 
 "BLOCK:block\n\
   ASSIGNMENT:=\n\
-    VAR:d\n\
+    VAR:d:-1\n\
     FUNCCALL:()call\n\
       ACCESSOR:.\n\
         FUNCCALL:()call\n\
           ACCESSOR:.\n\
             ACCESSOR:.\n\
               ACCESSOR:.\n\
-                VAR:a\n\
-                VAR:b\n\
-              VAR:c\n\
-            VAR:__getitem__\n\
+                VAR:a:-1\n\
+                VAR:b:-1\n\
+              VAR:c:-1\n\
+            VAR:__getitem__:-1\n\
           PARAMS:params\n\
             FUNCCALL:slicecall\n\
-              VAR:slice\n\
+              VAR:slice:-1\n\
               PARAMS:params\n\
                 INTEGER:1\n\
                 INTEGER:2\n\
                 INTEGER:3\n\
-        VAR:__getitem__\n\
+        VAR:__getitem__:-1\n\
       PARAMS:params\n\
         INTEGER:1\n", &tree);
     test_parse_block("def func():\n\    yield a", 
@@ -487,7 +487,7 @@ else:\n\
     PARAMS:params\n\
     BLOCK:block\n\
       YIELD:yield\n\
-        VAR:a\n", &tree);
+        VAR:a:-1\n", &tree);
     test_parse_block("def func():\n\    while True:\n\        yield a", 
 "BLOCK:block\n\
   GENFUNCDEF:func\n\
@@ -495,10 +495,10 @@ else:\n\
     PARAMS:params\n\
     BLOCK:block\n\
       WHILE:WHILE\n\
-        VAR:True\n\
+        VAR:True:-1\n\
         BLOCK:block\n\
           YIELD:yield\n\
-            VAR:a\n", &tree);
+            VAR:a:-1\n", &tree);
     test_parse_block("def func():\n\    def func2():\n\        yield a\n\    return 1",
 "BLOCK:block\n\
   FUNCDEF:func\n\
@@ -511,22 +511,22 @@ else:\n\
         PARAMS:params\n\
         BLOCK:block\n\
           YIELD:yield\n\
-            VAR:a\n\
+            VAR:a:-1\n\
       RETURN:return\n\
         INTEGER:1\n", &tree);
     test_parse_block("d[\"num\"] = 5",
 "BLOCK:block\n\
   FUNCCALL:call()\n\
     ACCESSOR:.\n\
-      VAR:d\n\
-      VAR:__setitem__\n\
+      VAR:d:-1\n\
+      VAR:__setitem__:-1\n\
     PARAMS:params\n\
       STRING:num\n\
       INTEGER:5\n", &tree);
     test_parse_block("print([1,2,3][a.__cmp__(9)])\n",
 "BLOCK:block\n\
   FUNCCALL:()call\n\
-    VAR:print\n\
+    VAR:print:-1\n\
     PARAMS:params\n\
       FUNCCALL:()call\n\
         ACCESSOR:.\n\
@@ -534,12 +534,12 @@ else:\n\
             INTEGER:1\n\
             INTEGER:2\n\
             INTEGER:3\n\
-          VAR:__getitem__\n\
+          VAR:__getitem__:-1\n\
         PARAMS:params\n\
           FUNCCALL:()call\n\
             ACCESSOR:.\n\
-              VAR:a\n\
-              VAR:__cmp__\n\
+              VAR:a:-1\n\
+              VAR:__cmp__:-1\n\
             PARAMS:params\n\
               INTEGER:9\n",&tree);
     test_parse_block(
@@ -556,7 +556,7 @@ else:\n\
     PARAMS:params\n\
     BLOCK:block\n\
       ASSIGNMENT:=\n\
-        VAR:a\n\
+        VAR:a:0\n\
         INTEGER:5\n\
       GENFUNCDEF:func2\n\
         FREEVARS:\n\
@@ -565,19 +565,19 @@ else:\n\
           CLOSURE:a\n\
         BLOCK:block\n\
           YIELD:yield\n\
-            VAR:a\n\
+            VAR:a:0\n\
           YIELD:yield\n\
-            VAR:b\n", &tree);
+            VAR:b:-1\n", &tree);
     test_parse_block(
 "if not False:\n\
     print(1)",
 "BLOCK:block\n\
   IF:if\n\
     NOT:not\n\
-      VAR:False\n\
+      VAR:False:-1\n\
     BLOCK:block\n\
       FUNCCALL:()call\n\
-        VAR:print\n\
+        VAR:print:-1\n\
         PARAMS:params\n\
           INTEGER:1\n",
 &tree);
@@ -595,25 +595,25 @@ print(c.value)",
         value:1\n\
         self:0\n\
       PARAMS:params\n\
-        VAR:self\n\
-        VAR:value\n\
+        VAR:self:0\n\
+        VAR:value:1\n\
       BLOCK:block\n\
         ASSIGNMENT:=\n\
           ACCESSOR:.\n\
-            VAR:self\n\
-            VAR:value\n\
-          VAR:value\n\
+            VAR:self:0\n\
+            VAR:value:-1\n\
+          VAR:value:1\n\
   ASSIGNMENT:=\n\
-    VAR:c\n\
+    VAR:c:-1\n\
     FUNCCALL:()call\n\
-      VAR:Cat\n\
+      VAR:Cat:-1\n\
       PARAMS:params\n\
   FUNCCALL:()call\n\
-    VAR:print\n\
+    VAR:print:-1\n\
     PARAMS:params\n\
       ACCESSOR:.\n\
-        VAR:c\n\
-        VAR:value\n",
+        VAR:c:-1\n\
+        VAR:value:-1\n",
 &tree);
     //fclose(stream);
     return 0;

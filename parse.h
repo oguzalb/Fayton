@@ -101,6 +101,7 @@ int tokenize_stream(FILE *fp, atom_tree_t* root, struct t_tokenizer *tokenizer);
 atom_t *parse_block(struct t_tokenizer *, int);
 struct t_tokenizer *new_tokenizer();
 void free_tokenizer(struct t_tokenizer *tokenizer);
+atom_tree_t *new_atom_tree();
 void free_atom_tree(atom_t *atom);
 void print_atom(atom_t *atom, char** dest, int indent, int test);
 char *atom_type_name(int type);
