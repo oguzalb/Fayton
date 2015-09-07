@@ -615,6 +615,44 @@ print(c.value)",
         VAR:c:-1\n\
         VAR:value:-1\n",
 &tree);
+    test_parse_block(
+"a = 5\n\
+assert a == 5, \"not 5\"\n\
+assert a == 4", 
+"BLOCK:block\n\
+  ASSIGNMENT:=\n\
+    VAR:a:-1\n\
+    INTEGER:5\n\
+  FUNCCALL:()call\n\
+    VAR:assert:-1\n\
+    PARAMS:params\n\
+      FUNCCALL:()call\n\
+        ACCESSOR:.\n\
+          FUNCCALL:()call\n\
+            ACCESSOR:.\n\
+              VAR:a:-1\n\
+              VAR:__cmp__:-1\n\
+            PARAMS:params\n\
+              INTEGER:5\n\
+          VAR:__eq__:-1\n\
+        PARAMS:params\n\
+          INTEGER:0\n\
+      STRING:not 5\n\
+  FUNCCALL:()call\n\
+    VAR:assert:-1\n\
+    PARAMS:params\n\
+      FUNCCALL:()call\n\
+        ACCESSOR:.\n\
+          FUNCCALL:()call\n\
+            ACCESSOR:.\n\
+              VAR:a:-1\n\
+              VAR:__cmp__:-1\n\
+            PARAMS:params\n\
+              INTEGER:4\n\
+          VAR:__eq__:-1\n\
+        PARAMS:params\n\
+          INTEGER:0\n",
+&tree);
     //fclose(stream);
     return 0;
     //fclose(fp);

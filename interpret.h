@@ -23,6 +23,7 @@
 #define NONE_TYPE 12
 #define SLICE_TYPE 13
 #define GENERATORFUNC_TYPE 14
+#define EXCEPTION_TYPE 15
 
 pthread_key_t py_thread_key;
 
@@ -120,7 +121,7 @@ struct py_thread {
     GArray *stack_trace;
     object_t *generator_channel;
     object_t *generator;
-    char * exc_msg;
+    object_t *exc;
 };
 
 // TODO last accessed should be moved to threads sacrebleu!
@@ -140,10 +141,11 @@ void register_global(char*, object_t *);
 object_t *get_global(char*);
 object_t *get_global_no_check(char*);
 object_t *new_class(char*, object_t **, object_t *(*)(object_t **, int), int);
+object_t *new_exception(object_t **, int);
 int args_len(object_t **args);
 void print_var(char*, object_t*);
 #define set_exception(fmt, args...) \
-    {char *msg; interpreter.error = RUN_ERROR; struct py_thread *mt = get_thread(); asprintf(&msg, fmt, ##args); mt->exc_msg = msg;}
+    {char *msg; interpreter.error = RUN_ERROR; struct py_thread *mt = get_thread(); asprintf(&msg, fmt, ##args); object_t *params[2] = {get_global("Exception"), new_str_internal(msg)}; mt->exc = new_exception(params, 2);}
 
 struct py_thread *get_thread();
 struct py_thread *new_thread_struct();

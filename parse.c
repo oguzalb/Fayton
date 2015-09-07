@@ -570,6 +570,24 @@ atom_t *parse_print(struct t_tokenizer *tokenizer) {
     return funccall;
 }
 
+atom_t *parse_assert(struct t_tokenizer *tokenizer) {
+    atom_t *funccall = new_atom(strdup("()call"), A_FUNCCALL);
+    atom_t *assert = new_atom(strdup("assert"), A_VAR);
+    add_child_atom(funccall, assert);
+    atom_t *params;
+    atom_t *tuple = parse_tuple(tokenizer, FALSE);
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(funccall);
+        return NULL;
+    }
+    params = new_atom(strdup("params"), A_PARAMS);
+    params->child = tuple->child;
+    tuple->child = NULL;
+    free_atom_tree(tuple);
+    add_child_atom(funccall, params);
+    return funccall;
+}
+
 atom_t *parse_slice(struct t_tokenizer *tokenizer) {
     printd("PARSE_GETITEM START\n");
     struct t_token* token = *tokenizer->iter;
@@ -1157,7 +1175,7 @@ atom_t *parse_expr(struct t_tokenizer *tokenizer) {
     return expr;
 }
 
-atom_t *parse_tuple(struct t_tokenizer *tokenizer, int assignment_stmt) {
+atom_t *parse_tuple(struct t_tokenizer *tokenizer, int var_tuple) {
     atom_t *tuple = new_atom(strdup("tuple"), A_TUPLE);
     struct t_token *token;
     while((token = *(tokenizer->iter))) {
@@ -1166,13 +1184,17 @@ atom_t *parse_tuple(struct t_tokenizer *tokenizer, int assignment_stmt) {
             tokenizer->error = PARSE_ERROR;
             return NULL;
         }
-        if (assignment_stmt && token->type != T_IDENTIFIER) {
+        if (var_tuple && token->type != T_IDENTIFIER) {
             tokenizer->error = PARSE_ERROR;
             free_atom_tree(tuple);
             printf("PARSE_TUPLE IDENTIFIER ERR\n");
             return NULL;
         }
-        atom_t *var = parse_atom(tokenizer);
+        atom_t *var;
+        if (var_tuple)
+            var  = parse_var(tokenizer, NULL);
+        else
+            var = parse_expr(tokenizer);
         if (tokenizer->error == PARSE_ERROR)
             return NULL;
         add_child_atom(tuple, var);
@@ -1430,6 +1452,9 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
     } else if (!strncmp(token->value, "print", 5)) {
         tokenizer->iter++;
         stmt = parse_print(tokenizer);
+    } else if (!strncmp(token->value, "assert", 6)) {
+        tokenizer->iter++;
+        stmt = parse_assert(tokenizer);
     } else {
         struct t_token **prev_iter = tokenizer->iter;
         atom_t *var = parse_var(tokenizer, NULL);

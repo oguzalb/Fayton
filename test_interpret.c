@@ -33,6 +33,7 @@ void test_interpret_block(char *code, atom_tree_t *tree) {
     printd("interpreting\n");
     interpret_block(tree->root, NULL, 0);
     if (interpreter.error == RUN_ERROR) {
+        interpreter.error = 0;
         struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
         print_stack_trace(main_thread);
         g_array_free(main_thread->stack_trace, FALSE);
@@ -61,6 +62,7 @@ void test_interpret_block_fail(char *code, atom_tree_t *tree) {
     printd("interpreting\n");
     interpret_block(tree->root, NULL, 0);
     assert(interpreter.error == RUN_ERROR);
+    interpreter.error = 0;
     struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
     print_stack_trace(main_thread);
     g_array_free(main_thread->stack_trace, FALSE);
@@ -190,6 +192,10 @@ c.func()", &tree);
         self.value = value\n\
 c = Cat(\"Tom\")\n\
 print(c.value)", &tree);
+    test_interpret_block_fail(
+"a = 5\n\
+assert a == 5\n\
+assert a == 4, \"not 4\"", &tree);
     return 0;
 }
 

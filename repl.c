@@ -83,6 +83,7 @@ int main() {
         printd("interpreting\n");
         interpret_block(tree->root, interpreter.globals, 0);
         if (interpreter.error == RUN_ERROR) {
+            interpreter.error = 0;
             struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
             print_stack_trace(main_thread);
             g_array_free(main_thread->stack_trace, FALSE);

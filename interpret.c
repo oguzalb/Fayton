@@ -19,6 +19,7 @@ char *object_type_name(int type) {
         case NONE_TYPE: return "NONE";
         case SLICE_TYPE: return "SLICE";
         case GENERATORFUNC_TYPE: return "GENERATORFUNC";
+        case EXCEPTION_TYPE: return "EXCEPTION";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -38,7 +39,9 @@ void print_stack_trace(struct py_thread *thread) {
     printf("%d elements\n", stack_trace->len);
     for (int i=0; i < stack_trace->len; i++)
         printf("-> %s\n", g_array_index(stack_trace, char*, i));
-    printf("%s\n", thread->exc_msg);
+    assert(thread->exc->type == EXCEPTION_TYPE);
+    object_t *str = object_call_str(thread->exc);
+    assert(str->type == STR_TYPE);
 }
 
 void print_var_each(gpointer name, gpointer obj, gpointer user_data) {
@@ -181,6 +184,25 @@ object_t *new_func(object_t *(*func)(object_t **, int), char *name, int expected
     return func_obj;
 }
 
+object_t *new_exception(object_t **args, int count) {
+    object_t *message = args[1];
+    object_t *exception_obj = new_object(EXCEPTION_TYPE);
+    exception_obj->class = args[0];
+    object_add_field(exception_obj, "message", message);
+    return exception_obj;
+}
+
+object_t *exception_str(object_t **args, int count) {
+    char *buff;
+    object_t *self = args[0];
+    object_t *message = object_get_field(self, "message");
+    asprintf(&buff, "%s: %s", self->class->class_props->name, message->str_props->ob_sval->str);
+printf("%s\n", buff);
+    object_t *str = new_str_internal(buff);
+    free(buff);
+    return str;
+}
+
 object_t *new_user_func(atom_t *func, char* name, GHashTable *kwargs) {
     object_t *func_obj = new_object(USERFUNC_TYPE);
     func_obj->userfunc_props = malloc(sizeof(struct userfunc_type));
@@ -240,13 +262,38 @@ object_t *range_func(object_t **args) {
     return list;
 }
 
-object_t *print_func(object_t **args) {
-    while (*args != NULL) {
-        object_t *obj_str = object_call_str(args[0]);
+object_t *assert_func(object_t **args, int count) {
+    if (count > 2) {
+        set_exception("assert takes at most 2 arguments");
+        return NULL;
+    }
+    if (count < 1) {
+        set_exception("assert takes at least 1 arguments");
+        return NULL;
+    }
+    object_t *expr_result = args[0];
+    object_t *message;
+    if (count == 2)
+        message = args[1];
+    else {
+        message = new_str_internal("Assertion false");
+    }
+    object_t *bool_result = new_bool_internal(expr_result);
+    if (interpreter.error == RUN_ERROR)
+        return NULL;
+    if (bool_result->bool_props->ob_bval == FALSE) {
+        set_exception(strdup(message->str_props->ob_sval->str));
+        return NULL;
+    }
+    return new_none_internal();
+}
+
+object_t *print_func(object_t **args, int count) {
+    for (int i=0; i < count; i++) {
+        object_t *obj_str = object_call_str(args[i]);
         if (interpreter.error == RUN_ERROR)
             return NULL;
         printf("%s\n", obj_str->str_props->ob_sval->str);
-        args++;
     }
 }
 
@@ -283,6 +330,10 @@ void init_interpreter() {
 
     init_int();
     init_str();
+    
+    object_t *exception_class = new_class(strdup("Exception"), NULL, new_exception, 2);
+    object_add_field(exception_class, "__str__", new_func(exception_str, strdup("__str__"), 1));
+    register_global(strdup("Exception"), exception_class);
     init_bool();
     init_none();
     init_slice();
@@ -298,6 +349,7 @@ void init_interpreter() {
     init_generator();
 
     register_global(strdup("print"), new_func(print_func, strdup("print"), -1));
+    register_global(strdup("assert"), new_func(assert_func, strdup("assert"), -1));
 }
 
 int count_non_global_vars(GHashTable* context) {
@@ -826,7 +878,6 @@ printd("A_WHILE\n");
                 inherits = inherits->next;
             }
             param_inherits[i] = NULL;
-printf("initializing class with parents\n");
             class = new_class(strdup(class_name->value), param_inherits, NULL, -1);
         }
         atom_t *field = stmt->child->next;
