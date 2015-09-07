@@ -971,6 +971,7 @@ object_t *interpret_block(atom_t *block, object_t **args, int current_indent) {
     } while (stmt = stmt->next);
     return NULL;
 }
+
 object_t *interpret_funcblock(atom_t *block, object_t **args, int current_indent) {
     object_t *result = interpret_block(block, args, current_indent);
     struct py_thread *thread = get_thread();

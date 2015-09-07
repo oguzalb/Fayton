@@ -47,10 +47,43 @@ char *read_input() {
     return input;
 }
 
-int main() {
+int evaluate(FILE *stream, atom_tree_t *tree) {
+    struct t_tokenizer *tokenizer = new_tokenizer(TRUE);
+    int success = tokenize_stream(stream, tree, tokenizer);
+    if (tokenizer->error == PARSE_ERROR) {
+        printf("Syntax error at line:%d\n", tokenizer->current_line);
+        free_tokenizer(tokenizer);
+        return 1;
+    }
+    // fclose(stream);
+    tree->root = parse_block(tokenizer, -1);
+    if (tokenizer->error == PARSE_ERROR) {
+        printf("Syntax error at line:%d %s\n", tokenizer->current_line, (*tokenizer->iter)==NULL?"":(*tokenizer->iter)->value);
+        free_tokenizer(tokenizer);
+        return 1;
+    }
+    free_tokenizer(tokenizer);
+    // this is for showing what we get as the ast tree, we won't have this when it is finished
+    char *buff = NULL;
+    print_atom(tree->root, &buff, 0, FALSE);
+    printf("%s\n", buff);
+    printd("interpreting\n");
+    interpret_block(tree->root, interpreter.globals, 0);
+    if (interpreter.error == RUN_ERROR) {
+        interpreter.error = 0;
+        struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
+        print_stack_trace(main_thread);
+        g_array_free(main_thread->stack_trace, FALSE);
+        main_thread->stack_trace = g_array_new(TRUE, TRUE, sizeof(char *));
+// TODO free also others
+        return 1;
+    }
+    return 0;
+}
+
+void repl_loop() {
     char* input;
     FILE *stream;
-    init_interpreter();
     GArray *trees = g_array_new(TRUE, TRUE, sizeof(atom_tree_t *));
     while (input = read_input()) {
         printf("code:%s\n", input);
@@ -59,37 +92,8 @@ int main() {
         atom_tree_t *tree = new_atom_tree();
         g_array_append_val(trees, tree);
         stream = fmemopen(input, strlen(input), "r");
-        struct t_tokenizer *tokenizer = new_tokenizer(TRUE);
-        int success = tokenize_stream(stream, tree, tokenizer);
-        if (tokenizer->error == PARSE_ERROR) {
-            printf("Syntax error at line:%d\n", tokenizer->current_line);
-            free_tokenizer(tokenizer);
-            free(input);
-            continue;
-        }
-        // fclose(stream);
+        evaluate(stream, tree);
         free(input);
-        tree->root = parse_block(tokenizer, -1);
-        if (tokenizer->error == PARSE_ERROR) {
-            printf("Syntax error at line:%d %s\n", tokenizer->current_line, (*tokenizer->iter)==NULL?"":(*tokenizer->iter)->value);
-            free_tokenizer(tokenizer);
-            continue;
-        }
-        free_tokenizer(tokenizer);
-        // this is for showing what we get as the ast tree, we won't have this when it is finished
-        char *buff = NULL;
-        print_atom(tree->root, &buff, 0, FALSE);
-        printf("%s\n", buff);
-        printd("interpreting\n");
-        interpret_block(tree->root, interpreter.globals, 0);
-        if (interpreter.error == RUN_ERROR) {
-            interpreter.error = 0;
-            struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
-            print_stack_trace(main_thread);
-            g_array_free(main_thread->stack_trace, FALSE);
-            main_thread->stack_trace = g_array_new(TRUE, TRUE, sizeof(char *));
-// TODO free also others
-        }
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
     }
     atom_tree_t *tree;
@@ -99,4 +103,27 @@ int main() {
         free(tree);
     }
     g_array_free(trees, TRUE);
+}
+
+int interpret_main(char* filename) {
+    FILE *fp = fopen(filename, "r");
+// TODO check file etc
+    atom_tree_t *tree = new_atom_tree();
+    int result = evaluate(fp, tree);
+    fclose(fp);
+    free(tree);
+    return result;
+}
+
+int main(int argc, char* argv[]) {
+    init_interpreter();
+    if (argc == 1)
+        repl_loop();
+    else if (argc == 2)
+        return interpret_main(argv[1]);
+    else {
+        printf("Takes an argument or no argument");
+        return 0;
+    }
+    return 0;
 }
