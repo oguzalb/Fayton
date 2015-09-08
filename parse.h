@@ -15,7 +15,7 @@
 #define printd(fmt, ...)
 #endif
 
-#define PARSE_ERROR 31
+#define PARSE_ERROR 800
 #define A_VAR 1
 #define A_INTEGER 2
 #define A_ASSIGNMENT 3

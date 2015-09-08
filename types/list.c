@@ -81,20 +81,22 @@ object_t *list_equals(object_t **args, int count) {
     object_t *other = args[1];
     GArray *self_ob_aval = self->list_props->ob_aval;
     GArray *other_ob_aval = other->list_props->ob_aval;
-    object_t *self_last = get_garray_end(self_ob_aval);
-    object_t *other_last = get_garray_end(other_ob_aval);
+    if (self_ob_aval->len == 0 || other_ob_aval->len == 0)
+        return new_bool_from_int(self_ob_aval->len == 0 || other_ob_aval->len == 0);
+    object_t **self_last = get_garray_end(self_ob_aval);
+    object_t **other_last = get_garray_end(other_ob_aval);
     object_t **p = get_garray_begin(self_ob_aval);
     object_t **po = get_garray_begin(other_ob_aval);
     int equals = TRUE;
     object_t *params[2] = {NULL, NULL};
-    for(;p <= self_last, po <= other_last; p++, po++) {
-        params[0] = p;
-        params[1] = po;
-        object_t *bool_result = object_call_func(p, params, 2, "__eq__");
+    for(;p <= self_last && po <= other_last; p++, po++) {
+        params[0] = *p;
+        params[1] = *po;
+        object_t *bool_result = object_call_func(*p, params, 2, "__eq__");
 // TODO userfunc may return something else
         equals &= bool_result->bool_props->ob_bval;
     }
-    if (p != self_last || po != other_last)
+    if (p <= self_last || po <= other_last)
         equals = FALSE;
     return new_bool_from_int(equals);
 }
@@ -226,6 +228,11 @@ object_t *new_list_internal() {
     return list;
 }
 
+object_t *list_len(object_t **args, int count) {
+    object_t *self = args[0];
+    return new_int_internal(self->list_props->ob_aval->len);
+}
+
 object_t *list_repr(object_t **args, int count) {
     object_t *self = args[0];
     char *str = NULL;
@@ -270,14 +277,15 @@ void init_list() {
     object_t *list_class = new_class(strdup("list"), NULL, new_list, -1);
     object_add_field(list_class, "__iter__", new_func(list_iter, strdup("__iter__"), 1));
     object_add_field(list_class, "__getitem__", new_func(list_getitem, strdup("__getitem__"), 2));
-    object_add_field(list_class, "__setitem__", new_func(list_setitem, strdup("__setitem__"), 2));
+    object_add_field(list_class, "__setitem__", new_func(list_setitem, strdup("__setitem__"), 3));
     object_add_field(list_class, "append", new_func(list_append, strdup("append"), 2));
     object_add_field(list_class, "extend", new_func(list_extend, strdup("extend"), 2));
     object_add_field(list_class, "insert", new_func(list_insert, strdup("insert"), 3));
     object_add_field(list_class, "__add__", new_func(list_add, strdup("__add__"), 2));
     object_add_field(list_class, "__eq__", new_func(list_equals, strdup("__eq__"), 2));
     object_add_field(list_class, "__repr__", new_func(list_repr, strdup("__repr__"), 1));
-    object_add_field(list_class, "pop", new_func(list_pop, strdup("pop"), 2));
+    object_add_field(list_class, "__len__", new_func(list_len, strdup("__len__"), 1));
+    object_add_field(list_class, "pop", new_func(list_pop, strdup("pop"), 1));
     object_add_field(list_class, "reverse", new_func(list_reverse, strdup("reverse"), 1));
     register_global(strdup("list"), list_class);
 }

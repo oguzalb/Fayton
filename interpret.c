@@ -794,6 +794,9 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
         object_t *params[2] = {iterator, NULL};
         object_t *item;
         while(item = object_call_func_obj(next_func, params, 1)) {
+// TODO should catch StopIterationException
+            if (item == new_none_internal())
+                break;
             if (interpreter.error == RUN_ERROR)
                 return NULL;
             if (var_name->type == A_TUPLE) {

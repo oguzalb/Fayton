@@ -47,8 +47,8 @@ char *read_input() {
     return input;
 }
 
-int evaluate(FILE *stream, atom_tree_t *tree) {
-    struct t_tokenizer *tokenizer = new_tokenizer(TRUE);
+int evaluate(FILE *stream, atom_tree_t *tree, int is_repl) {
+    struct t_tokenizer *tokenizer = new_tokenizer(is_repl);
     int success = tokenize_stream(stream, tree, tokenizer);
     if (tokenizer->error == PARSE_ERROR) {
         printf("Syntax error at line:%d\n", tokenizer->current_line);
@@ -92,7 +92,7 @@ void repl_loop() {
         atom_tree_t *tree = new_atom_tree();
         g_array_append_val(trees, tree);
         stream = fmemopen(input, strlen(input), "r");
-        evaluate(stream, tree);
+        evaluate(stream, tree, TRUE);
         free(input);
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
     }
@@ -109,7 +109,7 @@ int interpret_main(char* filename) {
     FILE *fp = fopen(filename, "r");
 // TODO check file etc
     atom_tree_t *tree = new_atom_tree();
-    int result = evaluate(fp, tree);
+    int result = evaluate(fp, tree, FALSE);
     fclose(fp);
     free(tree);
     return result;

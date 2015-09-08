@@ -618,7 +618,7 @@ print(c.value)",
     test_parse_block(
 "a = 5\n\
 assert a == 5, \"not 5\"\n\
-assert a == 4", 
+assert a == 4",
 "BLOCK:block\n\
   ASSIGNMENT:=\n\
     VAR:a:-1\n\
@@ -628,31 +628,35 @@ assert a == 4",
     PARAMS:params\n\
       FUNCCALL:()call\n\
         ACCESSOR:.\n\
-          FUNCCALL:()call\n\
-            ACCESSOR:.\n\
-              VAR:a:-1\n\
-              VAR:__cmp__:-1\n\
-            PARAMS:params\n\
-              INTEGER:5\n\
+          VAR:a:-1\n\
           VAR:__eq__:-1\n\
         PARAMS:params\n\
-          INTEGER:0\n\
+          INTEGER:5\n\
       STRING:not 5\n\
   FUNCCALL:()call\n\
     VAR:assert:-1\n\
     PARAMS:params\n\
       FUNCCALL:()call\n\
         ACCESSOR:.\n\
-          FUNCCALL:()call\n\
-            ACCESSOR:.\n\
-              VAR:a:-1\n\
-              VAR:__cmp__:-1\n\
-            PARAMS:params\n\
-              INTEGER:4\n\
+          VAR:a:-1\n\
           VAR:__eq__:-1\n\
         PARAMS:params\n\
-          INTEGER:0\n",
+          INTEGER:4\n",
 &tree);
+    test_parse_block(
+"def func():\n\
+    pass\n",
+"BLOCK:block\n\
+  FUNCDEF:func:-1\n\
+    FREEVARS:\n\
+    PARAMS:params\n\
+    BLOCK:block\n", &tree);
+    test_parse_block(
+"class klass():\n\
+    pass\n",
+"BLOCK:block\n\
+  CLASS:klass:-1\n\
+    PARAMS:params\n", &tree);
     //fclose(stream);
     return 0;
     //fclose(fp);

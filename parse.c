@@ -1,36 +1,37 @@
 #include "parse.h"
 
 #define T_IDENTIFIER 1
-#define T_MODULE (1 << 1)
-#define T_IMPORT (1 << 2)
-#define T_DOTCHAR (1 << 3)
-#define T_SPACE (1 << 4)
-#define T_NUMBER (1 << 5)
-#define T_INITIAL (1 << 6)
-#define T_COLUMN (1 << 7)
-#define T_LT (1 << 8)
-#define T_GT (1 << 9)
-#define T_OPHAR ((1 << 10))
-#define T_CPHAR (1 << 11)
-#define T_COMMA (1 << 12)
-#define T_EQUALS (1 << 13)
-#define T_STRING (1 << 14)
-#define T_EOL (1 << 15)
-#define T_ELSE (1 << 16)
-#define T_OBRACKET (1 << 17)
-#define T_CBRACKET (1 << 18)
-#define T_PLUS (1 << 19)
-#define T_MINUS (1 << 20)
-#define T_MULTIPLY (1 << 21)
-#define T_DIVIDE (1 << 22)
-#define T_AND (1 << 23)
-#define T_OR (1 << 24)
-#define T_EQUALSEQUALS (1 << 25)
-#define T_INDENT (1 << 26)
-#define T_OCURLY (1 << 27)
-#define T_CCURLY (1 << 28)
-#define T_RSHIFT (1 << 29)
-#define T_LSHIFT (1 << 30)
+#define T_MODULE 2
+#define T_IMPORT 3
+#define T_DOTCHAR 4
+#define T_SPACE 5
+#define T_NUMBER 6
+#define T_INITIAL 7
+#define T_COLUMN 8
+#define T_LT 9
+#define T_GT 10
+#define T_OPHAR 11
+#define T_CPHAR 12
+#define T_COMMA 13
+#define T_EQUALS 14
+#define T_STRING 15
+#define T_EOL 16
+#define T_ELSE 17
+#define T_OBRACKET 18
+#define T_CBRACKET 19
+#define T_PLUS 20
+#define T_MINUS 21
+#define T_MULTIPLY 22
+#define T_DIVIDE 23
+#define T_AND 24
+#define T_OR 25
+#define T_EQUALSEQUALS 26
+#define T_INDENT 27
+#define T_OCURLY 28
+#define T_CCURLY 29
+#define T_RSHIFT 30
+#define T_LSHIFT 31
+#define T_NEQUALS 32
 
 struct t_tokenizer *new_tokenizer(int is_repl){
     struct t_tokenizer *tokenizer = malloc(sizeof(struct t_tokenizer));
@@ -151,6 +152,7 @@ char *token_type_name(int type) {
         case T_CCURLY: return "CCURLY";
         case T_RSHIFT: return "RSHIFT";
         case T_LSHIFT: return "LSHIFT";
+        case T_NEQUALS: return "NEQUALS";
     printf("COULDNT FIND TOKEN TYPE\n");
     assert(FALSE);
     }
@@ -378,6 +380,16 @@ int token(struct t_tokenizer *tokenizer, char *buffer, FILE *fp) {
                 }
                 fseek(fp, -1, SEEK_CUR);
                 c = '=';
+            } else if (c == '!') {
+                c = fgetc(fp);
+                if (c == '=') {
+                    buffer[0] = '!';
+                    buffer[1] = '=';
+                    buffer[2] = '\0';
+                    return T_NEQUALS;
+                }
+                fseek(fp, -1, SEEK_CUR);
+                c = '!';
             }
             int types[] = {T_SPACE, T_DOTCHAR, T_PLUS, T_MULTIPLY, T_OPHAR, T_CPHAR, T_COMMA, T_EOL, T_EQUALS, T_MINUS, T_COLUMN, T_OBRACKET, T_CBRACKET, T_OCURLY, T_CCURLY, T_DIVIDE};
             char chars[] = {' ', '.', '+', '*', '(', ')', ',', '\n', '=', '-', ':', '[', ']', '{', '}', '/'};
@@ -388,7 +400,7 @@ int token(struct t_tokenizer *tokenizer, char *buffer, FILE *fp) {
                     cur_type = types[j];
             }
             if (cur_type == T_INITIAL) {
-                printd("token not identified %c\n", c);
+                printf("token not identified %c\n", c);
                 return PARSE_ERROR;
             }
             buffer[i++] = c;
@@ -403,6 +415,7 @@ int token(struct t_tokenizer *tokenizer, char *buffer, FILE *fp) {
         }
         if (cur_type == T_INITIAL) {
             tokenizer->error = PARSE_ERROR;
+            printf("Token type not found\n");
             break;
         }
     }
@@ -1045,44 +1058,67 @@ atom_t *parse_shift(struct t_tokenizer *tokenizer) {
     return top_shift != NULL? top_shift : arith;
 }
 
+
+atom_t *call_with_func(struct t_tokenizer *tokenizer, atom_t *expr, char* name);
 atom_t *parse_comp(struct t_tokenizer *tokenizer) {
     atom_t *shift = parse_shift(tokenizer);
     if (tokenizer->error == PARSE_ERROR)
         return NULL;
     struct t_token *token;
     atom_t *top_comp = NULL;
-    while ((token = *tokenizer->iter)!= NULL && (token->type == T_GT || token->type == T_LT || token->type == T_EQUALSEQUALS)) {
+    while ((token = *tokenizer->iter)!= NULL && (token->type == T_GT || token->type == T_LT || token->type == T_EQUALSEQUALS || token->type == T_NEQUALS)) {
         tokenizer->iter++;
         atom_t *equals_accessor = new_atom(strdup("."), A_ACCESSOR);
         atom_t *equals = new_atom(strdup("__eq__"), A_VAR);
         atom_t *equals_call = new_atom(strdup("()call"), A_FUNCCALL);
-        atom_t *comp = new_atom(strdup("()call"), A_FUNCCALL);
+        atom_t *equals_params = new_atom(strdup("params"), A_PARAMS);
         atom_t *sec_shift = parse_shift(tokenizer);
         if (tokenizer->error == PARSE_ERROR) {
             free_atom_tree(top_comp != NULL? top_comp:shift);
             return NULL;
         }
-        atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
-        if (top_comp == NULL)
-            add_child_atom(accessor, shift);
-        else
-            add_child_atom(accessor, top_comp);
-        atom_t *cmp = new_atom(strdup("__cmp__"), A_VAR);
-        add_child_atom(accessor, cmp);
-        add_child_atom(comp, accessor);
-        atom_t *params = new_atom(strdup("params"), A_PARAMS);
-        add_child_atom(params, sec_shift);
-        add_child_atom(comp, params);
+        if (token->type == T_NEQUALS) {
+            if (top_comp == NULL)
+                add_child_atom(equals_accessor, shift);
+            else
+                add_child_atom(equals_accessor, top_comp);
+            add_child_atom(equals_accessor, equals);
+            add_child_atom(equals_params, sec_shift);
+            atom_t *not = new_atom(strdup("not"), A_NOT);
+            add_child_atom(not, equals_call);
+            top_comp = not;
+        } else if (token->type != T_EQUALSEQUALS) {
+            atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
+            if (top_comp == NULL)
+                add_child_atom(accessor, shift);
+            else
+                add_child_atom(accessor, top_comp);
 
-        add_child_atom(equals_accessor, comp);
-        add_child_atom(equals_accessor, equals);
+            atom_t *comp = new_atom(strdup("()call"), A_FUNCCALL);
+            add_child_atom(comp, accessor);
+            atom_t *cmp = new_atom(strdup("__cmp__"), A_VAR);
+            add_child_atom(accessor, cmp);
+            atom_t *params = new_atom(strdup("params"), A_PARAMS);
+            add_child_atom(params, sec_shift);
+            add_child_atom(comp, params);
+
+            add_child_atom(equals_accessor, comp);
+            atom_t *comp_result = new_atom(strdup(token->type == T_GT? "1":token->type == T_LT?"-1":"0"), A_INTEGER);
+            add_child_atom(equals_params, comp_result);
+            add_child_atom(equals_accessor, equals);
+            top_comp = equals_call;
+        } else {
+            if (top_comp == NULL)
+                add_child_atom(equals_accessor, shift);
+            else
+                add_child_atom(equals_accessor, top_comp);
+            add_child_atom(equals_accessor, equals);
+            add_child_atom(equals_params, sec_shift);
+            top_comp = equals_call;
+        }
 
         add_child_atom(equals_call, equals_accessor);
-        atom_t *equals_params = new_atom(strdup("params"), A_PARAMS);
-        atom_t *comp_result = new_atom(strdup(token->type == T_GT? "1":token->type == T_LT?"-1":"0"), A_INTEGER);
-        add_child_atom(equals_params, comp_result);
         add_child_atom(equals_call, equals_params);
-        top_comp = equals_call;
     }
     return top_comp != NULL? top_comp : shift;
 }
@@ -1455,6 +1491,17 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
     } else if (!strncmp(token->value, "assert", 6)) {
         tokenizer->iter++;
         stmt = parse_assert(tokenizer);
+    } else if (!strncmp(token->value, "pass", 4)) {
+        tokenizer->iter++;
+        struct t_token *eol = *tokenizer->iter;
+        if (eol == NULL)
+            return NULL;
+        if (eol->type != T_EOL) {
+            printf("PARSE PASS ERR NOT EOL\n");
+            tokenizer->error = PARSE_ERROR;
+            return NULL;
+        }
+        return NULL;
     } else {
         struct t_token **prev_iter = tokenizer->iter;
         atom_t *var = parse_var(tokenizer, NULL);
@@ -1866,6 +1913,8 @@ atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
             }
             printd("PARSED CLASS METHOD\n");
             add_child_atom(class, field);
+        } else if (!strcmp(token->value, "pass")) {
+            tokenizer->iter++;
         } else {
             struct t_token **prev_iter = tokenizer->iter;
             field = parse_var(tokenizer, NULL);
@@ -1927,6 +1976,7 @@ int tokenize_stream(FILE *fp, atom_tree_t* root, struct t_tokenizer *tokenizer) 
     }
     tokenizer->tokens[i] = NULL;
     if (type == PARSE_ERROR) {
+        printd("Error while tokenizing\n");
         tokenizer->error = PARSE_ERROR;
         return FALSE;
     }

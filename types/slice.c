@@ -54,7 +54,7 @@ void set_indices(object_t* slice, int last_index, int* start, int* stop, int* st
     if (*stop < -1)
         *stop = -1;
     else if (*stop > last_index)
-        *stop = last_index;
+        *stop = last_index + 1;
 }
 
 object_t *new_slice_internal(object_t *start, object_t *stop, object_t *step) {

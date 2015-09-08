@@ -85,7 +85,6 @@ object_t *dict_setitem(object_t **args, int count) {
 }
 
 object_t *new_dict(object_t **args, int count) {
-printf("initializing dict\n");
     if (count > 1) {
         set_exception("dict from iterable not implemented yet\n");
         return NULL;

@@ -4,6 +4,8 @@ DEBUG=
 TYPES=object.c int.c bool.c list.c dict.c str.c thread.c none.c slice.c generator.c
 SOURCES=interpret.c parse.c $(TYPES:%.c=types/%.c) utils.c
 OBJECTS=$(SOURCES:.c=.o)
+PY_TESTS=test_list.py test_int.py test_for.py test_bool.py test_class.py
+PY_TEST_PATHS=$(PY_TESTS:%.py=tests/%.py)
 .c.o:
 	cc -c $< ${DEBUG} ${LIBS} ${FLAGS} -o $@
 
@@ -18,6 +20,9 @@ clean:
 test_run:  all
 	./test_parse.out
 	./test_interpret.out
+	for py_test in $(PY_TEST_PATHS); do \
+	    ./repl.out $$py_test ; \
+	done
 test_valgrind_run:  all
 	valgrind ./test_parse.out
 	valgrind ./test_interpret.out
