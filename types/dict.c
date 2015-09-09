@@ -62,7 +62,7 @@ object_t *dict_get(object_t **args, int count) {
     object_t *self = args[0];
     object_t *key = args[1];
     object_t *obj = g_hash_table_lookup(self->dict_props->ob_dval, key);
-    return obj != NULL ? obj : (args[2]?args[2]:new_none_internal());
+    return obj != NULL ? obj : (count == 3?args[2]:new_none_internal());
 }
 
 object_t *dict_getitem(object_t **args, int count) {
@@ -84,6 +84,47 @@ object_t *dict_setitem(object_t **args, int count) {
     return new_none_internal();
 }
 
+object_t *dict_equals(object_t **args, int count) {
+    object_t *self = args[0];
+    object_t *other = args[1];
+    GHashTable *self_ob_dval = self->dict_props->ob_dval;
+    GHashTable *other_ob_dval = other->dict_props->ob_dval;
+    int self_size = g_hash_table_size(self_ob_dval);
+    int other_size = g_hash_table_size(other_ob_dval);
+
+    if (self_size == 0 || other_size == 0)
+        return new_bool_from_int(self_size == 0 && other_size == 0);
+    int equals = TRUE;
+    object_t *params[2] = {NULL, NULL};
+    GHashTableIter iter_self;
+    GHashTableIter iter_other;
+    gpointer key_self, value_self;
+    gpointer key_other, value_other;
+    g_hash_table_iter_init (&iter_self, self_ob_dval);
+    g_hash_table_iter_init (&iter_other, other_ob_dval);
+    int self_has_next;
+    int other_has_next;
+    while ((self_has_next = g_hash_table_iter_next (&iter_self, &key_self, &value_self)) &&  g_hash_table_iter_next(&iter_other, &key_other, &value_other)) {
+        params[0] = (object_t *)(void *) key_self;
+        params[1] = (object_t *)(void *) key_other;
+        object_t *bool_result = object_call_func(params[0], params, 2, "__eq__");
+        if (interpreter.error == RUN_ERROR)
+            return NULL;
+        equals &= bool_result->bool_props->ob_bval;
+        params[0] = (object_t *)(void *) value_self;
+        params[1] = (object_t *)(void *) value_other;
+        bool_result = object_call_func(params[0], params, 2, "__eq__");
+        if (interpreter.error == RUN_ERROR)
+            return NULL;
+// TODO userfunc may return something else
+        equals &= bool_result->bool_props->ob_bval;
+    }
+    if (self_has_next || (!self_has_next && g_hash_table_iter_next(&iter_other, &key_other, &value_other)))
+        equals = FALSE;
+    return new_bool_from_int(equals);
+}
+
+
 object_t *new_dict(object_t **args, int count) {
     if (count > 1) {
         set_exception("dict from iterable not implemented yet\n");
@@ -101,10 +142,11 @@ void init_dict() {
     object_t *dict_class = new_class(strdup("dict"), NULL, new_dict, 1);
     //object_add_field(dict_class, "__iter__", new_func(iter_dict_func));
     object_add_field(dict_class, "keys", new_func(dict_keys, strdup("keys"), 1));
-    object_add_field(dict_class, "values", new_func(dict_keys, strdup("values"), 1));
-    object_add_field(dict_class, "get", new_func(dict_get, strdup("keys"), 1));
+    object_add_field(dict_class, "values", new_func(dict_values, strdup("values"), 1));
+    object_add_field(dict_class, "get", new_func(dict_get, strdup("get"), -1));
     object_add_field(dict_class, "__getitem__", new_func(dict_getitem, strdup("__getitem__"), 2));
     object_add_field(dict_class, "__setitem__", new_func(dict_setitem, strdup("__setitem__"), 3));
     object_add_field(dict_class, "__repr__", new_func(dict_repr, strdup("__repr__"), 1));
+    object_add_field(dict_class, "__eq__", new_func(dict_equals, strdup("__eq__"), 2));
     register_global(strdup("dict"), dict_class);
 }

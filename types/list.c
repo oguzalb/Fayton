@@ -93,6 +93,8 @@ object_t *list_equals(object_t **args, int count) {
         params[0] = *p;
         params[1] = *po;
         object_t *bool_result = object_call_func(*p, params, 2, "__eq__");
+        if (interpreter.error == RUN_ERROR)
+            return NULL;
 // TODO userfunc may return something else
         equals &= bool_result->bool_props->ob_bval;
     }
