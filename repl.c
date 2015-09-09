@@ -69,10 +69,11 @@ int evaluate(FILE *stream, atom_tree_t *tree, int is_repl) {
     printf("%s\n", buff);
     printd("interpreting\n");
     interpret_block(tree->root, interpreter.globals, 0);
-    if (interpreter.error == RUN_ERROR) {
-        interpreter.error = 0;
+    object_t *exception;
+    if (exception = get_exception()) {
+        clear_exception();
         struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
-        print_stack_trace(main_thread);
+        print_stack_trace(exception);
         g_array_free(main_thread->stack_trace, FALSE);
         main_thread->stack_trace = g_array_new(TRUE, TRUE, sizeof(char *));
 // TODO free also others

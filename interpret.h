@@ -93,6 +93,10 @@ struct slice_type {
     struct _object *step;
 };
 
+struct exception_type {
+    struct py_thread *thread;
+};
+
 typedef struct _object {
     int type;
     struct _object *class;
@@ -110,6 +114,7 @@ typedef struct _object {
         struct generatorfunc_type *generatorfunc_props;
         struct listiterator_type *listiterator_props;
         struct slice_type *slice_props;
+        struct exception_type *exception_props;
     };
 } object_t;
 
@@ -145,7 +150,10 @@ object_t *new_exception(object_t **, int);
 int args_len(object_t **args);
 void print_var(char*, object_t*);
 #define set_exception(fmt, args...) \
-    {char *msg; interpreter.error = RUN_ERROR; struct py_thread *mt = get_thread(); asprintf(&msg, fmt, ##args); object_t *params[2] = {get_global("Exception"), new_str_internal(msg)}; mt->exc = new_exception(params, 2);}
+    {char *msg; struct py_thread *mt = get_thread(); asprintf(&msg, fmt, ##args); object_t *params[2] = {get_global("Exception"), new_str_internal(msg)}; mt->exc = new_exception(params, 2);}
+
+#define get_exception() get_thread()->exc
+#define clear_exception() {get_thread()->exc = NULL;}
 
 struct py_thread *get_thread();
 struct py_thread *new_thread_struct();

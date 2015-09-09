@@ -11,7 +11,7 @@ gboolean object_equal(gconstpointer a, gconstpointer b) {
         return g_direct_equal(a, b);
     object_t *params[3] = {aobj, bobj, NULL};
     object_t *res = object_call_func_obj(eq_func, params, 2);
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return FALSE;
     if (res->type != BOOL_TYPE) {
         set_exception("__eq__ should return bool type");
@@ -69,14 +69,14 @@ object_t *object_call_func_obj(object_t *func, object_t **param_objs, int count)
 
 object_t *object_call_func(object_t *object, object_t **args, int count, char *func_name) {
    object_t *func = object_get_field(object, func_name);
-   if (interpreter.error == RUN_ERROR)
+   if (get_exception())
        return NULL;
    return object_call_func_obj(func, args, count);
 }
 
 object_t *object_call_func_no_param(object_t *object, char *func_name) {
    object_t *func = object_get_field(object, func_name);
-   if (interpreter.error == RUN_ERROR)
+   if (get_exception())
        return NULL;
    object_t *params[2] = {object, NULL};
    return object_call_func_obj(func, params, 1);
@@ -84,7 +84,7 @@ object_t *object_call_func_no_param(object_t *object, char *func_name) {
 
 object_t *object_call_repr(object_t *object) {
     object_t *item_str = object_call_func_no_param(object, "__repr__");
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     if (item_str->type != STR_TYPE) {
         set_exception("__repr__ should be a function returning string");
@@ -109,10 +109,10 @@ object_t *object_and(object_t **args, int count) {
     object_t *self = args[0];
     object_t *other = args[1];
     object_t *self_bool = new_bool_internal(self);
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     object_t *other_bool = new_bool_internal(other);
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     return new_bool_from_int(self_bool->bool_props->ob_bval & other_bool->bool_props->ob_bval);
 }
@@ -121,17 +121,17 @@ object_t *object_or(object_t **args, int count) {
     object_t *self = args[0];
     object_t *other = args[1];
     object_t *self_bool = new_bool_internal(self);
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     object_t *other_bool = new_bool_internal(other);
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     return new_bool_internal(self_bool->bool_props->ob_bval | other_bool->bool_props->ob_bval);
 }
 
 object_t *object_call_str(object_t *object) {
     object_t *item_str = object_call_func_no_param(object, "__str__");
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     if (item_str->type != STR_TYPE) {
         set_exception("__str__ should be a function returning string");
@@ -149,7 +149,7 @@ object_t *object_equals(object_t **args, int count) {
     }
     object_t *params[3] = {left, right, NULL};
     object_t *int_result = object_call_func_obj(cmp_func, params, 2);
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     return new_bool_from_int(int_result->int_props->ob_ival == 0);
 }

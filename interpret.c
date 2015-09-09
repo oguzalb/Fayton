@@ -3,6 +3,7 @@
 #define g_array_set(glist, item, index) \
     {*(((object_t **)(void *) glist->data) + index) = item;}
 
+
 char *object_type_name(int type) {
     switch(type) {
         case INT_TYPE: return "INT";
@@ -33,15 +34,16 @@ struct py_thread * get_thread() {
     return g_array_index(interpreter.threads, struct py_thread *, *index);
 }
 
-void print_stack_trace(struct py_thread *thread) {
+void print_stack_trace(object_t *exception) {
+    struct py_thread *thread = exception->exception_props->thread;
     GArray *stack_trace = thread->stack_trace;
     printf("stack trace:\n");
     printf("%d elements\n", stack_trace->len);
     for (int i=0; i < stack_trace->len; i++)
         printf("-> %s\n", g_array_index(stack_trace, char*, i));
-    assert(thread->exc->type == EXCEPTION_TYPE);
-    object_t *str = object_call_str(thread->exc);
+    object_t *str = object_call_str(exception);
     assert(str->type == STR_TYPE);
+    printf("%s\n", str->str_props->ob_sval->str);
 }
 
 void print_var_each(gpointer name, gpointer obj, gpointer user_data) {
@@ -188,19 +190,15 @@ object_t *new_exception(object_t **args, int count) {
     object_t *message = args[1];
     object_t *exception_obj = new_object(EXCEPTION_TYPE);
     exception_obj->class = args[0];
+    exception_obj->exception_props = malloc(sizeof(struct exception_type));
+    exception_obj->exception_props->thread = get_thread();
     object_add_field(exception_obj, "message", message);
     return exception_obj;
 }
 
 object_t *exception_str(object_t **args, int count) {
-    char *buff;
     object_t *self = args[0];
-    object_t *message = object_get_field(self, "message");
-    asprintf(&buff, "%s: %s", self->class->class_props->name, message->str_props->ob_sval->str);
-printf("%s\n", buff);
-    object_t *str = new_str_internal(buff);
-    free(buff);
-    return str;
+    return object_get_field(self, "message");
 }
 
 object_t *new_user_func(atom_t *func, char* name, GHashTable *kwargs) {
@@ -225,10 +223,10 @@ object_t *new_generator_func(atom_t *func, char* name) {
 object_t *sum_func(object_t **args) {
     object_t *iterable = args[0];
     object_t *iterator = object_call_func_no_param(iterable, "__iter__");
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     object_t *next_func = object_get_field(iterator, "next");
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     int sum = 0;
     object_t *int_obj = NULL;
@@ -279,7 +277,7 @@ object_t *assert_func(object_t **args, int count) {
         message = new_str_internal("Assertion false");
     }
     object_t *bool_result = new_bool_internal(expr_result);
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     if (bool_result->bool_props->ob_bval == FALSE) {
         set_exception(strdup(message->str_props->ob_sval->str));
@@ -291,7 +289,7 @@ object_t *assert_func(object_t **args, int count) {
 object_t *print_func(object_t **args, int count) {
     for (int i=0; i < count; i++) {
         object_t *obj_str = object_call_str(args[i]);
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         printf("%s\n", obj_str->str_props->ob_sval->str);
     }
@@ -301,11 +299,13 @@ struct py_thread *new_thread_struct() {
     struct py_thread *thread = malloc(sizeof(struct py_thread));
     thread->stack_trace = g_array_new(TRUE, TRUE, sizeof(char *));
     thread->generator = NULL;
+    thread->exc = NULL;
     return thread;
 }
 
 void local_storage_destructor(int *value) {
 }
+
 
 void init_interpreter() {
     interpreter.error = 0;
@@ -371,7 +371,7 @@ int count_non_global_vars(GHashTable* context) {
 object_t *interpret_expr(atom_t *,object_t **, int);
 object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_indent) {
     object_t *func = interpret_expr(func_call->child, args, current_indent);
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     if (interpreter.last_accessed)
         print_var("last", interpreter.last_accessed);
@@ -441,7 +441,7 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
         while (param) {
 // TODO kwargs should be supported for builtins
             object_t *value = interpret_expr(param, args, current_indent);
-            if (interpreter.error == RUN_ERROR) {
+            if (get_exception()) {
                 return NULL;
             }
             printd("ADDING ARGUMENT %s\n", param->value);
@@ -458,7 +458,7 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
         }
         while (param && param_name && param_name->type == A_VAR) {
             object_t *value = interpret_expr(param, args, current_indent);
-            if (interpreter.error == RUN_ERROR) {
+            if (get_exception()) {
                 return NULL;
             }
             printd("ADDING ARGUMENT %s\n", param->value);
@@ -483,7 +483,7 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
         while (param && (param->type != A_VAR || param->child == NULL) && param_name && param_name->type == A_KWARG) {
             printd("adding kwarg %s\n", param_name->value);
             object_t *value = interpret_expr(param, args, current_indent);
-            if (interpreter.error == RUN_ERROR) {
+            if (get_exception()) {
                 return NULL;
             }
             g_hash_table_insert(inner_kwargs, param_name->value, value);
@@ -495,7 +495,7 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
             assert(param->child != NULL);
             printd("adding named kwarg %s\n", param->value);
             object_t *value = interpret_expr(param->child, args, current_indent);
-            if (interpreter.error == RUN_ERROR) {
+            if (get_exception()) {
                 return NULL;
             }
             g_hash_table_insert(inner_kwargs, param->value, value);
@@ -538,11 +538,11 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
         result = object_call_func(func, inner_args, inner_args_count, "__new__");
         // TODO this is a workaround, new should get class
         result->class = func;
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
     } else
         assert(FALSE);
-    if (interpreter.error != RUN_ERROR) {
+    if (get_exception() == NULL) {
         g_array_remove_index(thread->stack_trace, thread->stack_trace->len - 1);
         free(func_name);
     }
@@ -558,7 +558,7 @@ object_t *interpret_list(atom_t *expr, object_t **args, int current_indent) {
     atom_t *elem = expr->child;
     while (elem != NULL) {
         object_t *result = interpret_expr(elem, args, current_indent);
-        if (interpreter.error == RUN_ERROR) {
+        if (get_exception()) {
             return NULL;
         }
         list_append_internal(list, result);
@@ -572,15 +572,15 @@ object_t *interpret_dict(atom_t *expr, object_t **args, int current_indent) {
     atom_t *elem = expr->child;
     while (elem != NULL) {
         object_t *key = interpret_expr(elem, args, current_indent);
-        if (interpreter.error == RUN_ERROR) {
+        if (get_exception()) {
             return dict;
         }
         object_t *value = interpret_expr(elem->next, args, current_indent);
-        if (interpreter.error == RUN_ERROR) {
+        if (get_exception()) {
             return dict;
         }
         g_hash_table_insert(dict->dict_props->ob_dval, key, value);
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         elem = elem->next->next;
     }
@@ -616,10 +616,10 @@ object_t *interpret_if(atom_t *expr, object_t **args, int current_indent) {
         } else {
 // TODO give it to bool
             object_t *expr = interpret_expr(if_block, args, current_indent);
-            if (interpreter.error == RUN_ERROR)
+            if (get_exception())
                 return NULL;
             object_t *bool_obj = new_bool_internal(expr);
-            if (interpreter.error == RUN_ERROR)
+            if (get_exception())
                 return NULL;
             if (bool_obj->type != BOOL_TYPE) {
                 set_exception("NOT A BOOL TYPE\n");
@@ -670,7 +670,7 @@ object_t *interpret_expr(atom_t *expr, object_t **args, int current_indent) {
         if (expr->child->type == A_VAR) {
             printd("%s\n", expr->child->value);
             object = lookup_var(args, expr->child);
-            if (interpreter.error == RUN_ERROR) {
+            if (get_exception()) {
                 return NULL;
             }
             print_var("object", object);
@@ -682,15 +682,15 @@ object_t *interpret_expr(atom_t *expr, object_t **args, int current_indent) {
         interpreter.last_accessed = object;
         printd("last accessed %p\n", object);
         object_t *field = object_get_field(object, expr->child->next->value);
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         return field;
     } else if (expr->type == A_NOT) {
         object_t *result = interpret_expr(expr->child, args, current_indent);
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         object_t *bool_obj = new_bool_internal(result);
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         return new_bool_from_int(!bool_obj->bool_props->ob_bval);
     } else {
@@ -749,7 +749,7 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
         atom_t *left_var = stmt->child;
         printd("ASSIGNING TO %s\n", left_var->value);
         object_t *result = interpret_expr(left_var->next, args, current_indent);
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         if (result == NULL) {
             printd("GOT NOTHING, can't assign\n");
@@ -758,7 +758,7 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
 
         if (left_var->type == A_ACCESSOR) {
             object_t *object = interpret_expr(left_var->child, args, current_indent);
-            if (interpreter.error == RUN_ERROR)
+            if (get_exception())
                 return NULL;
             object_t *set_attr = object_get_field_no_check(object, "__setattr__");
             if (set_attr != NULL) {
@@ -779,17 +779,17 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
         atom_t *var_name = stmt->child;
         atom_t *expr = var_name->next;
         object_t *iterable = interpret_expr(expr, args, current_indent);
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         printd("calling __iter__\n");
         object_t *iterator = object_call_func_no_param(iterable, "__iter__");
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         printd("calling __iter__ END\n");
         assert(iterator->class != NULL);
         atom_t *block = expr->next;
         object_t *next_func = object_get_field(iterator, "next");
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         object_t *params[2] = {iterator, NULL};
         object_t *item;
@@ -797,20 +797,20 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
 // TODO should catch StopIterationException
             if (item == new_none_internal())
                 break;
-            if (interpreter.error == RUN_ERROR)
+            if (get_exception())
                 return NULL;
             if (var_name->type == A_TUPLE) {
                 object_t *tuple_it = object_call_func_no_param(item, "__iter__");
-                if (interpreter.error == RUN_ERROR)
+                if (get_exception())
                     return NULL;
                 object_t *next_func = object_get_field(tuple_it, "next");
-                if (interpreter.error == RUN_ERROR)
+                if (get_exception())
                     return NULL;
                 object_t *next_params[2] = {tuple_it, NULL};
                 object_t *tuple_item;
                 atom_t *tuple_item_name = var_name->child;
                 while ((tuple_item = object_call_func_obj(next_func, next_params, 1)) && tuple_item_name != NULL) {
-                    if (interpreter.error == RUN_ERROR)
+                    if (get_exception())
                         return NULL;
                     if (tuple_item_name->type != A_VAR) {
                         set_exception("recursuve tuple unpack is not implemented yet\n");
@@ -827,7 +827,7 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
                 set_var(args, var_name, item);
             }
             interpret_block(block, args, current_indent);
-            if (interpreter.error == RUN_ERROR) {
+            if (get_exception()) {
                 return NULL;
             }
         }
@@ -846,7 +846,7 @@ printd("A_WHILE\n");
             kwargs = g_hash_table_new(g_str_hash, g_str_equal);
             while (param != NULL) {
                 object_t *value = interpret_expr(param->child, args, current_indent);
-                if (interpreter.error == RUN_ERROR)
+                if (get_exception())
                     return NULL;
                 g_hash_table_insert(kwargs, strdup(param->value), value);
                 param = param->next;
@@ -897,7 +897,7 @@ printd("A_WHILE\n");
                     kwargs = g_hash_table_new(g_str_hash, g_str_equal);
                     while (param != NULL && param->child != NULL) {
                         object_t *value = interpret_expr(param->child, args, current_indent);
-                       if (interpreter.error == RUN_ERROR)
+                       if (get_exception())
                             return NULL;
                         g_hash_table_insert(kwargs, param->value, value);
                     }
@@ -914,7 +914,7 @@ printd("A_WHILE\n");
                 prepare_func_args(generatorfunc, args, current_indent);
             } else if (field->type == A_VAR) {
                 object_t *result = interpret_expr(field->child, args, current_indent);
-                if (interpreter.error == RUN_ERROR)
+                if (get_exception())
                     return NULL;
                 object_add_field(class, field->value, result);
                 printd("added class field %s.%s\n", class_name->value, field->value);
@@ -967,7 +967,7 @@ object_t *interpret_block(atom_t *block, object_t **args, int current_indent) {
     object_t *last_result;
     do {
         object_t *ret = interpret_stmt(stmt, args, current_indent);
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         if (ret != NULL)
             return ret;

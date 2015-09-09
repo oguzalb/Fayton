@@ -41,12 +41,12 @@ object_t *dict_repr(object_t **args, int count) {
         if (cursor != str+1)
             cursor = fay_strcat(&str, ", ", cursor);
 	object_t *key_str = object_call_repr((object_t *)(void*)key);
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         cursor = fay_strcat(&str, key_str->str_props->ob_sval->str, cursor);
         cursor = fay_strcat(&str, ":", cursor);
         object_t *value_str = object_call_repr((object_t*)(void*)value);
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         cursor = fay_strcat(&str, value_str->str_props->ob_sval->str, cursor);
     }
@@ -67,7 +67,7 @@ object_t *dict_get(object_t **args, int count) {
 
 object_t *dict_getitem(object_t **args, int count) {
     object_t *value = dict_get(args, count);
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     if (value == NULL || value->type == NONE_TYPE) {
         set_exception("KeyError");
@@ -108,13 +108,13 @@ object_t *dict_equals(object_t **args, int count) {
         params[0] = (object_t *)(void *) key_self;
         params[1] = (object_t *)(void *) key_other;
         object_t *bool_result = object_call_func(params[0], params, 2, "__eq__");
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
         equals &= bool_result->bool_props->ob_bval;
         params[0] = (object_t *)(void *) value_self;
         params[1] = (object_t *)(void *) value_other;
         bool_result = object_call_func(params[0], params, 2, "__eq__");
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
 // TODO userfunc may return something else
         equals &= bool_result->bool_props->ob_bval;

@@ -93,7 +93,7 @@ object_t *list_equals(object_t **args, int count) {
         params[0] = *p;
         params[1] = *po;
         object_t *bool_result = object_call_func(*p, params, 2, "__eq__");
-        if (interpreter.error == RUN_ERROR)
+        if (get_exception())
             return NULL;
 // TODO userfunc may return something else
         equals &= bool_result->bool_props->ob_bval;
@@ -205,7 +205,7 @@ object_t *list_getitem(object_t **args, int count) {
     int start, stop, step;
     int last_index = list->list_props->ob_aval->len - 1;
     set_indices(slice, last_index, &start, &stop, &step);
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     object_t **glist_stop = glist_begin + stop;
     object_t **glist_start = glist_begin + start;

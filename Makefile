@@ -26,3 +26,6 @@ test_run:  all
 test_valgrind_run:  all
 	valgrind ./test_parse.out
 	valgrind ./test_interpret.out
+	for py_test in $(PY_TEST_PATHS); do \
+	    valgrind ./repl.out $$py_test || break; \
+	done

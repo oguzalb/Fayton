@@ -118,7 +118,7 @@ object_t *str_getitem(object_t **args, int count) {
     int start, stop, step;
     int last_index = str->str_props->ob_sval->len - 1;
     set_indices(slice, last_index, &start, &stop, &step);
-    if (interpreter.error == RUN_ERROR)
+    if (get_exception())
         return NULL;
     char* str_stop = str_begin + stop;
     char* str_start = str_begin + start;
