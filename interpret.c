@@ -89,6 +89,7 @@ object_t *new_class(char* name, object_t **inherits, object_t *(*func)(object_t 
     cls = new_object(CLASS_TYPE);
     cls->class_props = malloc(sizeof(struct class_type));
     int count;
+// TODO should be refactored, very dirty
     if (inherits == NULL)
         count = 1;
     else {
@@ -100,8 +101,13 @@ object_t *new_class(char* name, object_t **inherits, object_t *(*func)(object_t 
     }
     cls->class_props->inherits = malloc((count + 1)*sizeof(object_t *));
     if (inherits == NULL) {
-        cls->class_props->inherits[0] = object_class;
-        cls->class_props->inherits[1] = NULL;
+        if (!strcmp("object", name)) {
+            free(cls->class_props->inherits);
+            cls->class_props->inherits = NULL;
+        } else { 
+            cls->class_props->inherits[0] = object_class;
+            cls->class_props->inherits[1] = NULL;
+        }
     } else {
        int i = 0;
         while (inherits[i] != NULL) {
@@ -295,6 +301,31 @@ object_t *print_func(object_t **args, int count) {
     }
 }
 
+
+
+int isinstance_internal(object_t *class, object_t *search_class) {
+    int inherits = class == search_class;
+    if (inherits == TRUE)
+        return inherits;
+    object_t **parent_it = search_class->class_props->inherits;
+    if (parent_it == NULL)
+        return inherits;
+    while (*parent_it != NULL) {
+        inherits |= isinstance_internal(class, *parent_it);
+        if (inherits == TRUE)
+            return inherits;
+        parent_it++;
+    }
+    return inherits;
+}
+
+object_t *isinstance_func(object_t **args, int count) {
+    object_t *class = args[0]->class;
+    if (class == NULL)
+        return new_bool_from_int(FALSE);
+    return new_bool_from_int(isinstance_internal(args[1], class));
+}
+
 object_t *raise_func(object_t **args, int count) {
     object_t *exception = args[0];
     if (exception->type != EXCEPTION_TYPE) {
@@ -359,6 +390,7 @@ void init_interpreter() {
     init_generator();
 
     register_global(strdup("print"), new_func(print_func, strdup("print"), -1));
+    register_global(strdup("isinstance"), new_func(isinstance_func, strdup("isinstance"), 2));
     register_global(strdup("raise"), new_func(raise_func, strdup("raise"), 1));
     register_global(strdup("assert"), new_func(assert_func, strdup("assert"), -1));
 }

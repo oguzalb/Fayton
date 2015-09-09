@@ -30,3 +30,7 @@ c = C()
 c.append(1)
 c.append(10)
 assert c.average() == 5, "builtin subclass can use new/parent functions"
+assert isinstance({}, dict) == True, "isinstance direct class"
+assert isinstance({}, object) == True, "isinstance parent class"
+assert isinstance({}, list) == False, "isinstance False"
+
