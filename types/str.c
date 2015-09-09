@@ -28,7 +28,60 @@ object_t *str_equals(object_t **args, int count) {
     object_t *other = args[1];
     return new_bool_from_int(!strcmp(self->str_props->ob_sval->str, other->str_props->ob_sval->str));
 }
- 
+
+object_t *str_format(object_t **args, int count) {
+    if (count > 3) {
+        set_exception("More than one format argument not supported yet\n");
+        return NULL;
+    }
+    object_t *self = args[0];
+    object_t **arg = &args[1];
+    object_t *arg_boundary = args + count;
+    char *format = self->str_props->ob_sval->str;
+    char *format_start = format;
+    char *dst = malloc(sizeof(char *));
+    dst[0] = '\0';
+    int dst_len = 1;
+    char *start = NULL;
+    char *end = NULL;
+    start = format;
+    end = start;
+    while (*end != '\0') {
+        while (*end == '%') {
+            end++;
+            if (*end == 's') {
+                if (arg == arg_boundary) {
+                    set_exception("more args needed\n");
+                    return NULL;
+                }
+                char *str = (*arg)->str_props->ob_sval->str;
+                int str_len = strlen(str);
+                dst_len += str_len;
+                dst = realloc(dst, sizeof(char) * (dst_len));
+                strncat(dst, str, str_len);
+                end++;
+                arg++;
+                start = end;
+            } else
+                end++;
+        }
+        while (*end != '\0' && *end != '%')
+            end++;
+        if (start != end) {
+            int buff_len = end - start;
+            dst_len += buff_len;
+            dst = realloc(dst, sizeof(char) * (dst_len));
+            strncat(dst, start, buff_len);
+            start = end;
+        }
+    }
+    if (arg != arg_boundary) {
+        set_exception("too many arguments\n");
+        return NULL;
+    }
+    return new_str_internal(dst);
+}
+
 object_t *str_hash(object_t **args, int count) {
     object_t *self = args[0];
     return new_int_internal(g_str_hash(self->str_props->ob_sval->str));
@@ -97,6 +150,7 @@ void init_str() {
     object_add_field(str_class, "__repr__", new_func(str_repr, strdup("__repr__"), 1));
     object_add_field(str_class, "__eq__", new_func(str_equals, strdup("__eq__"), 2));
     object_add_field(str_class, "__cmp__", new_func(str_cmp, strdup("__cmp__"), 2));
+    object_add_field(str_class, "__mod__", new_func(str_format, strdup("__mod__"), 2));
     object_add_field(str_class, "__hash__", new_func(str_hash, strdup("__hash__"), 1));
     object_add_field(str_class, "__getitem__", new_func(str_getitem, strdup("__getitem__"), 2));
     register_global(strdup("str"), str_class);
