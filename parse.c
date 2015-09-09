@@ -205,6 +205,7 @@ char *atom_type_name(int type) {
         case A_CLOSURE: return "CLOSURE";
         case A_NOT: return "NOT";
         case A_KWARG: return "KWARG";
+        case A_TRY: return "TRY";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -1249,9 +1250,11 @@ atom_t *parse_tuple(struct t_tokenizer *tokenizer, int var_tuple) {
             return NULL;
         }
         atom_t *var;
-        if (var_tuple)
+        if (var_tuple) {
             var  = parse_var(tokenizer, NULL);
-        else
+            if (var->child == NULL)
+                add_freevar(tokenizer, var);
+        } else
             var = parse_expr(tokenizer);
         if (tokenizer->error == PARSE_ERROR)
             return NULL;
@@ -1464,6 +1467,7 @@ atom_t *call_with_func(struct t_tokenizer *tokenizer, atom_t *expr, char* name) 
     return funccall;
 }
 
+atom_t *parse_try(struct t_tokenizer *tokenizer, int current_indent);
 atom_t *parse_class(struct t_tokenizer *, int);
 atom_t *parse_if(struct t_tokenizer *, int);
 atom_t *parse_for(struct t_tokenizer *, int);
@@ -1495,6 +1499,9 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
     } else if (!strcmp(token->value, "for")) {
         tokenizer->iter++;
         stmt = parse_for(tokenizer, current_indent);
+    } else if (!strcmp(token->value, "try")) {
+        tokenizer->iter++;
+        stmt = parse_try(tokenizer, current_indent);
     } else if (!strcmp(token->value, "while")) {
         tokenizer->iter++;
         stmt = parse_while(tokenizer, current_indent);
@@ -1863,6 +1870,103 @@ atom_t *parse_while(struct t_tokenizer *tokenizer, int current_indent) {
     return while_loop;
 }
 
+atom_t *parse_try(struct t_tokenizer *tokenizer, int current_indent) {
+    struct t_token *column = *tokenizer->iter;
+    if (column == NULL || column->type != T_COLUMN) {
+        printf("PARSE_TRY column\n");
+        tokenizer->error = PARSE_ERROR;
+        return NULL;
+    }
+    tokenizer->iter++;
+    struct t_token *eol = *tokenizer->iter;
+    if (eol == NULL || eol->type != T_EOL) {
+        printf("PARSE_TRY not eol\n");
+        tokenizer->error = PARSE_ERROR;
+        return NULL;
+    }
+    tokenizer->iter++;
+    atom_t *block = parse_block(tokenizer, current_indent);
+    if (tokenizer->error == PARSE_ERROR)
+        return NULL;
+    atom_t *try = new_atom(strdup("try"), A_TRY);
+    add_child_atom(try, block);
+    struct t_token *indent = *tokenizer->iter;
+    int indent_count;
+    if (indent->type != T_INDENT)
+        indent_count = 0;
+    else {
+        indent_count = *indent->value;
+        tokenizer->iter++;
+    }
+    if (indent == NULL || indent_count != current_indent) {
+        printf("PARSE_TRY indent\n");
+        tokenizer->error = PARSE_ERROR;
+        free_atom_tree(try);
+        return NULL;
+    }
+    struct t_token *except = *tokenizer->iter;
+    if (except == NULL || strcmp("except", except->value)) {
+        printf("PARSE_TRY except\n");
+        tokenizer->error = PARSE_ERROR;
+        free_atom_tree(try);
+        return NULL;
+    }
+    tokenizer->iter++;
+    atom_t *classes = new_atom(strdup("classes"), A_PARAMS);
+    add_child_atom(try, classes);
+    column = *tokenizer->iter;
+    if (column != NULL && column->type != T_COLUMN) {
+        atom_t *tuple = parse_tuple(tokenizer, FALSE);
+        if (tokenizer->error == PARSE_ERROR) {
+            free_atom_tree(try);
+            return NULL;
+        }
+        add_child_atom(classes, tuple->child);
+        tuple->child = NULL;
+        free_atom_tree(tuple);
+        column = *tokenizer->iter;
+    }
+    atom_t *as = new_atom(strdup("as"), A_PARAMS);
+    add_child_atom(try, as);
+    if (column != NULL && !strcmp(column->value, "as")) {
+        tokenizer->iter++;
+        struct t_token *var_name = *tokenizer->iter;
+        if (var_name == NULL) {
+            tokenizer->error = PARSE_ERROR;
+            printf("PARSE_TRY no var name after as\n");
+            return NULL;
+        }
+        tokenizer->iter++;
+        atom_t *var = new_atom(strdup(var_name->value), A_VAR);
+        add_freevar(tokenizer, var);
+        add_child_atom(as, var);
+        column = *tokenizer->iter;
+    }
+    if (column == NULL || column->type != T_COLUMN) {
+        printf("PARSE_TRY column\n");
+        tokenizer->error = PARSE_ERROR;
+        free_atom_tree(try);
+        return NULL;
+    }
+    tokenizer->iter++;
+    eol = *tokenizer->iter;
+    if (eol == NULL || eol->type != T_EOL) {
+        printf("PARSE_FOR not eol\n");
+        tokenizer->error = PARSE_ERROR;
+        free_atom_tree(try);
+        return NULL;
+    }
+    tokenizer->iter++;
+    atom_t *except_block = parse_block(tokenizer, current_indent);
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(try);
+        return NULL;
+    }
+    add_child_atom(try, except_block);
+printf("HERE\n");
+    return try;
+}
+
 atom_t *parse_class(struct t_tokenizer *tokenizer, int current_indent) {
    //TODO TODO  INDENT!?!
     struct t_token *class_name = *tokenizer->iter;
@@ -2028,7 +2132,7 @@ int tokenize_stream(FILE *fp, atom_tree_t* root, struct t_tokenizer *tokenizer) 
             tokens++;
             continue;
         }
-        if (indent_count > 0) {
+        if (indent_count != 0) {
             int *indent_count_p = malloc(sizeof(int));
             *indent_count_p = indent_count;
             struct t_token * token = new_token();

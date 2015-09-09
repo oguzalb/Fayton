@@ -657,6 +657,66 @@ assert a == 4",
 "BLOCK:block\n\
   CLASS:klass:-1\n\
     PARAMS:params\n", &tree);
+    test_parse_block(
+"try:\n\
+    print i\n\
+except:\n\
+    print 2",
+"BLOCK:block\n\
+  TRY:try\n\
+    BLOCK:block\n\
+      FUNCCALL:()call\n\
+        VAR:print:-1\n\
+        PARAMS:params\n\
+          VAR:i:-1\n\
+    PARAMS:classes\n\
+    PARAMS:as\n\
+    BLOCK:block\n\
+      FUNCCALL:()call\n\
+        VAR:print:-1\n\
+        PARAMS:params\n\
+          INTEGER:2\n", &tree);
+    test_parse_block(
+"try:\n\
+    print i\n\
+except Exception:\n\
+    print 2",
+"BLOCK:block\n\
+  TRY:try\n\
+    BLOCK:block\n\
+      FUNCCALL:()call\n\
+        VAR:print:-1\n\
+        PARAMS:params\n\
+          VAR:i:-1\n\
+    PARAMS:classes\n\
+      VAR:Exception:-1\n\
+    PARAMS:as\n\
+    BLOCK:block\n\
+      FUNCCALL:()call\n\
+        VAR:print:-1\n\
+        PARAMS:params\n\
+          INTEGER:2\n", &tree);
+     test_parse_block(
+"try:\n\
+    print i\n\
+except Exception as e:\n\
+    print 2",
+"BLOCK:block\n\
+  TRY:try\n\
+    BLOCK:block\n\
+      FUNCCALL:()call\n\
+        VAR:print:-1\n\
+        PARAMS:params\n\
+          VAR:i:-1\n\
+    PARAMS:classes\n\
+      VAR:Exception:-1\n\
+    PARAMS:as\n\
+      VAR:e:-1\n\
+    BLOCK:block\n\
+      FUNCCALL:()call\n\
+        VAR:print:-1\n\
+        PARAMS:params\n\
+          INTEGER:2\n", &tree);
     //fclose(stream);
     return 0;
     //fclose(fp);

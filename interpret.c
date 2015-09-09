@@ -753,6 +753,25 @@ void prepare_func_args(object_t *func, object_t **args, int current_indent) {
     }
 }
 
+object_t *interpret_try(atom_t *stmt, object_t **args, int current_indent) {
+    atom_t *block = stmt->child;
+    object_t *ret = interpret_block(block, args, current_indent);
+    struct py_thread *thread = get_thread();
+    object_t *exception = thread->exc;
+    if (exception == NULL && ret != NULL)
+        return ret;
+    thread->exc = NULL;
+    atom_t *classes = block->next;
+    atom_t *as = classes->next;
+    atom_t *except_block = as->next;
+// TODO exception types after isinstance gets implemented
+    if (as->child)
+        set_var(args, as->child, exception);
+    object_t *result = interpret_block(except_block, args, current_indent);
+// TODO reraise and/or trace cleanup
+    return result;
+}
+
 object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
     if (stmt->type == A_FUNCCALL) {
         interpret_expr(stmt, args, current_indent);
@@ -845,6 +864,8 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
     } else if (stmt->type == A_IF) {
 printd("A_IF\n");
         return interpret_if(stmt, args, current_indent);
+    } else if (stmt->type == A_TRY) {
+        return interpret_try(stmt, args, current_indent);
     } else if (stmt->type == A_WHILE) {
 printd("A_WHILE\n");
         return interpret_while(stmt, args, current_indent);
