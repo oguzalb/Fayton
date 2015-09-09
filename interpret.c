@@ -790,10 +790,23 @@ object_t *interpret_try(atom_t *stmt, object_t **args, int current_indent) {
     object_t *ret = interpret_block(block, args, current_indent);
     struct py_thread *thread = get_thread();
     object_t *exception = thread->exc;
-    if (exception == NULL && ret != NULL)
+    if (exception == NULL)
         return ret;
-    thread->exc = NULL;
     atom_t *classes = block->next;
+    if (classes->child != NULL) {
+        int isinstance = FALSE;
+        atom_t *class = classes->child;
+        thread->exc = NULL;
+        object_t *class_obj = interpret_expr(class, args, current_indent);
+        if (get_exception())
+            return NULL;
+        thread->exc = exception;
+        isinstance |= isinstance_internal(class_obj, exception->class);
+        if (isinstance == FALSE)
+            return ret;
+    }
+
+    thread->exc = NULL;
     atom_t *as = classes->next;
     atom_t *except_block = as->next;
 // TODO exception types after isinstance gets implemented
@@ -1027,7 +1040,7 @@ object_t *interpret_block(atom_t *block, object_t **args, int current_indent) {
     }
     atom_t *stmt = block->child;
     if (stmt == NULL)
-        return new_none_internal();
+        return NULL;
     object_t *last_result;
     do {
         object_t *ret = interpret_stmt(stmt, args, current_indent);
