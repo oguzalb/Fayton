@@ -43,7 +43,7 @@ void print_stack_trace(object_t *exception) {
         printf("-> %s\n", g_array_index(stack_trace, char*, i));
     object_t *str = object_call_str(exception);
     assert(str->type == STR_TYPE);
-    printf("%s\n", str->str_props->ob_sval->str);
+    printf("%s: %s\n", exception->class->class_props->name, str->str_props->ob_sval->str);
 }
 
 void print_var_each(gpointer name, gpointer obj, gpointer user_data) {
@@ -295,6 +295,16 @@ object_t *print_func(object_t **args, int count) {
     }
 }
 
+object_t *raise_func(object_t **args, int count) {
+    object_t *exception = args[0];
+    if (exception->type != EXCEPTION_TYPE) {
+        set_exception("Should be an exception");
+        return NULL;
+    }
+    get_thread()->exc = exception;
+    return NULL;
+}
+
 struct py_thread *new_thread_struct() {
     struct py_thread *thread = malloc(sizeof(struct py_thread));
     thread->stack_trace = g_array_new(TRUE, TRUE, sizeof(char *));
@@ -349,6 +359,7 @@ void init_interpreter() {
     init_generator();
 
     register_global(strdup("print"), new_func(print_func, strdup("print"), -1));
+    register_global(strdup("raise"), new_func(raise_func, strdup("raise"), 1));
     register_global(strdup("assert"), new_func(assert_func, strdup("assert"), -1));
 }
 

@@ -33,6 +33,7 @@
 #define T_LSHIFT 31
 #define T_NEQUALS 32
 #define T_MOD 33
+#define T_RAISE 34
 
 struct t_tokenizer *new_tokenizer(int is_repl){
     struct t_tokenizer *tokenizer = malloc(sizeof(struct t_tokenizer));
@@ -155,6 +156,7 @@ char *token_type_name(int type) {
         case T_LSHIFT: return "LSHIFT";
         case T_NEQUALS: return "NEQUALS";
         case T_MOD: return "MOD";
+        case T_RAISE: return "RAISE";
     printf("COULDNT FIND TOKEN TYPE\n");
     assert(FALSE);
     }
@@ -555,6 +557,24 @@ printf("PARSE_CALLPARAMS COMMA ERR %s %s\n", token->value, token_type_name(token
 }
 
 atom_t *parse_tuple(struct t_tokenizer *, int);
+atom_t *parse_raise(struct t_tokenizer *tokenizer) {
+    atom_t *funccall = new_atom(strdup("()call"), A_FUNCCALL);
+    atom_t *raise = new_atom(strdup("raise"), A_VAR);
+    add_child_atom(funccall, raise);
+    atom_t *tuple = parse_tuple(tokenizer, FALSE);
+    if (tokenizer->error == PARSE_ERROR) {
+        free_atom_tree(funccall);
+        return NULL;
+    }
+    atom_t *params = new_atom(strdup("params"), A_PARAMS);
+    params->child = tuple->child;
+    tuple->child = NULL;
+    free_atom_tree(tuple);
+    add_child_atom(funccall, params);
+    
+    return funccall;
+}
+
 atom_t *parse_print(struct t_tokenizer *tokenizer) {
     atom_t *funccall = new_atom(strdup("()call"), A_FUNCCALL);
     atom_t *print = new_atom(strdup("print"), A_VAR);
@@ -570,7 +590,7 @@ atom_t *parse_print(struct t_tokenizer *tokenizer) {
             return NULL;
         }
         tokenizer->iter++;
-   } else {
+    } else {
         atom_t *tuple = parse_tuple(tokenizer, FALSE);
         if (tokenizer->error == PARSE_ERROR) {
             free_atom_tree(funccall);
@@ -580,7 +600,7 @@ atom_t *parse_print(struct t_tokenizer *tokenizer) {
         params->child = tuple->child;
         tuple->child = NULL;
         free_atom_tree(tuple);
-   }
+    }
     add_child_atom(funccall, params);
     return funccall;
 }
@@ -1490,6 +1510,9 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
     } else if (!strncmp(token->value, "print", 5)) {
         tokenizer->iter++;
         stmt = parse_print(tokenizer);
+    } else if (!strncmp(token->value, "raise", 5)) {
+        tokenizer->iter++;
+        stmt = parse_raise(tokenizer);
     } else if (!strncmp(token->value, "assert", 6)) {
         tokenizer->iter++;
         stmt = parse_assert(tokenizer);
