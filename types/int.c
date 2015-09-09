@@ -43,6 +43,17 @@ object_t *int_div(object_t **args, int count) {
     return new_int_internal(left->int_props->ob_ival / right->int_props->ob_ival);
 }
 
+object_t *int_mod(object_t **args, int count) {
+    object_t *left = args[0];
+    object_t *right = args[1];
+    if (left->type != INT_TYPE || right->type != INT_TYPE) {
+        set_exception("Both parameters should be integer\n");
+        return NULL;
+    }
+    return new_int_internal(left->int_props->ob_ival % right->int_props->ob_ival);
+}
+
+
 object_t *int_cmp(object_t **args, int count) {
     object_t *left = args[0];
     object_t *right = args[1];
@@ -120,6 +131,7 @@ void init_int() {
     object_add_field(int_class, "__mul__", new_func(int_mul, strdup("__mul__"), 2));
     object_add_field(int_class, "__sub__", new_func(int_sub, strdup("__sub__"), 2));
     object_add_field(int_class, "__div__", new_func(int_div, strdup("__div__"), 2));
+    object_add_field(int_class, "__mod__", new_func(int_mod, strdup("__mod__"), 2));
     object_add_field(int_class, "__lshift__", new_func(int_lshift, strdup("__lshift__"), 2));
     object_add_field(int_class, "__rshift__", new_func(int_rshift, strdup("__rshift__"), 2));
     object_add_field(int_class, "__cmp__", new_func(int_cmp, strdup("__cmp__"), 2));

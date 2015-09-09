@@ -32,6 +32,7 @@
 #define T_RSHIFT 30
 #define T_LSHIFT 31
 #define T_NEQUALS 32
+#define T_MOD 33
 
 struct t_tokenizer *new_tokenizer(int is_repl){
     struct t_tokenizer *tokenizer = malloc(sizeof(struct t_tokenizer));
@@ -153,6 +154,7 @@ char *token_type_name(int type) {
         case T_RSHIFT: return "RSHIFT";
         case T_LSHIFT: return "LSHIFT";
         case T_NEQUALS: return "NEQUALS";
+        case T_MOD: return "MOD";
     printf("COULDNT FIND TOKEN TYPE\n");
     assert(FALSE);
     }
@@ -391,8 +393,8 @@ int token(struct t_tokenizer *tokenizer, char *buffer, FILE *fp) {
                 fseek(fp, -1, SEEK_CUR);
                 c = '!';
             }
-            int types[] = {T_SPACE, T_DOTCHAR, T_PLUS, T_MULTIPLY, T_OPHAR, T_CPHAR, T_COMMA, T_EOL, T_EQUALS, T_MINUS, T_COLUMN, T_OBRACKET, T_CBRACKET, T_OCURLY, T_CCURLY, T_DIVIDE};
-            char chars[] = {' ', '.', '+', '*', '(', ')', ',', '\n', '=', '-', ':', '[', ']', '{', '}', '/'};
+            int types[] = {T_SPACE, T_DOTCHAR, T_PLUS, T_MULTIPLY, T_OPHAR, T_CPHAR, T_COMMA, T_EOL, T_EQUALS, T_MINUS, T_COLUMN, T_OBRACKET, T_CBRACKET, T_OCURLY, T_CCURLY, T_DIVIDE, T_MOD};
+            char chars[] = {' ', '.', '+', '*', '(', ')', ',', '\n', '=', '-', ':', '[', ']', '{', '}', '/', '%'};
             int ocount = sizeof(chars);
             int j;
             for (j=0; j < ocount && cur_type == T_INITIAL; j++) {
@@ -965,7 +967,7 @@ atom_t *parse_term(struct t_tokenizer *tokenizer) {
     struct t_token *token;
     atom_t *top_muldiv = NULL;
 token = *tokenizer->iter;
-    while ((token = *tokenizer->iter) != NULL && (token->type == T_MULTIPLY || token->type == T_DIVIDE)) {
+    while ((token = *tokenizer->iter) != NULL && (token->type == T_MULTIPLY || token->type == T_DIVIDE || token->type == T_MOD)) {
         atom_t *muldiv = new_atom(strdup("()call"), A_FUNCCALL);
         tokenizer->iter++;
         atom_t *sec_power = parse_power(tokenizer);
@@ -976,12 +978,12 @@ token = *tokenizer->iter;
         if (top_muldiv == NULL) {
             atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
             add_child_atom(accessor, power);
-            add_child_atom(accessor, new_atom(strdup(token->type == T_MULTIPLY ? "__mul__" : "__div__" ), A_VAR));
+            add_child_atom(accessor, new_atom(strdup(token->type == T_MULTIPLY ? "__mul__" : token->type == T_DIVIDE ? "__div__" : "__mod__"), A_VAR));
             add_child_atom(muldiv, accessor);
         } else {
             atom_t *accessor = new_atom(strdup("."), A_ACCESSOR);
             add_child_atom(accessor, top_muldiv);
-            add_child_atom(accessor, new_atom(strdup(token->type == T_MULTIPLY ? "__mul__" : "__div__" ), A_VAR));
+            add_child_atom(accessor, new_atom(strdup(token->type == T_MULTIPLY ? "__mul__" : token->type == T_DIVIDE ? "__div__" : "__mod__"), A_VAR));
             add_child_atom(muldiv, accessor);
         }
         atom_t *params = new_atom(strdup("params"), A_PARAMS);
