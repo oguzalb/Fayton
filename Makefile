@@ -1,7 +1,7 @@
 LIBS=`pkg-config --cflags glib-2.0` `pkg-config --libs glib-2.0` -lreadline -lpthread
 FLAGS=-std=gnu99 -g
 DEBUG=
-TYPES=object.c int.c bool.c list.c dict.c str.c thread.c none.c slice.c generator.c
+TYPES=object.c int.c bool.c list.c dict.c str.c thread.c none.c slice.c generator.c exception.c
 SOURCES=interpret.c parse.c $(TYPES:%.c=types/%.c) utils.c
 OBJECTS=$(SOURCES:.c=.o)
 PY_TESTS=test_list.py test_int.py test_for.py test_bool.py test_class.py test_dict.py test_try.py test_import.py test_kwargs.py

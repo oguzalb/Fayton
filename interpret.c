@@ -29,7 +29,7 @@ char *object_type_name(int type) {
 
 #define FUNC_STRUCT_TYPE(x) object_t *(*x)(object_t **)
 
-struct py_thread * get_thread() {
+struct py_thread *get_thread() {
     int *index = pthread_getspecific(py_thread_key);
     printd("%d got thread key\n", *index);
     return g_array_index(interpreter.threads, struct py_thread *, *index);
@@ -112,7 +112,6 @@ object_t *lookup_var(object_t **args, atom_t *var) {
     return obj;
 }
 
-
 object_t *new_class(char* name, object_t **inherits, object_t *(*func)(object_t **, int), int expected_args_count) {
     object_t *cls;
     printd("Creating the class %s\n", name);
@@ -187,16 +186,6 @@ object_t *new_func(object_t *(*func)(object_t **, int), char *name, int expected
     return func_obj;
 }
 
-object_t *new_exception(object_t **args, int count) {
-    object_t *message = args[1];
-    object_t *exception_obj = new_object(EXCEPTION_TYPE);
-    exception_obj->class = args[0];
-    exception_obj->exception_props = malloc(sizeof(struct exception_type));
-    exception_obj->exception_props->thread = get_thread();
-    object_add_field(exception_obj, "message", message);
-    return exception_obj;
-}
-
 object_t *add_get_module(char* name) {
     object_t *module = g_hash_table_lookup(interpreter.modules, name);
     if (module == NULL) {
@@ -207,11 +196,6 @@ object_t *add_get_module(char* name) {
         g_hash_table_insert(interpreter.modules, name, module);
     }
     return module;
-}
-
-object_t *exception_str(object_t **args, int count) {
-    object_t *self = args[0];
-    return object_get_field(self, "message");
 }
 
 object_t *new_user_func(atom_t *func, char* name, GHashTable *kwargs) {
@@ -309,8 +293,6 @@ object_t *print_func(object_t **args, int count) {
     }
 }
 
-
-
 int isinstance_internal(object_t *class, object_t *search_class) {
     int inherits = class == search_class;
     if (inherits == TRUE)
@@ -381,18 +363,8 @@ void init_interpreter() {
 
     init_int();
     init_str();
-    
-    object_t *exception_class = new_class(strdup("Exception"), NULL, new_exception, 2);
-    object_add_field(exception_class, "__str__", new_func(exception_str, strdup("__str__"), 1));
-    register_builtin(strdup("Exception"), exception_class);
 
-    object_t **exc_inherits[2] = {exception_class, NULL};
-    object_t *assert_error_class = new_class(strdup("AssertionError"), exc_inherits, NULL, 2);
-    register_builtin(strdup("AssertionError"), assert_error_class);
-    object_t *import_error_class = new_class(strdup("ImportError"), exc_inherits, NULL, 2);
-    register_builtin(strdup("ImportError"), import_error_class);
-    object_t *type_error_class = new_class(strdup("TypeError"), exc_inherits, NULL, 2);
-    register_builtin(strdup("TypeError"), type_error_class);
+    init_exception();
 
     init_bool();
     init_none();
