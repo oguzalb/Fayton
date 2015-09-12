@@ -30,5 +30,5 @@ object_t *new_thread(object_t **args) {
 
 void init_thread () {
     object_t *thread_class = new_class(strdup("Thread"), NULL, new_thread, 1);
-    register_global(strdup("Thread"), thread_class);
+    register_builtin(strdup("Thread"), thread_class);
 }

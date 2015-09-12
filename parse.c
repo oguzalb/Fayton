@@ -206,6 +206,7 @@ char *atom_type_name(int type) {
         case A_NOT: return "NOT";
         case A_KWARG: return "KWARG";
         case A_TRY: return "TRY";
+        case A_IMPORT: return "IMPORT";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -482,6 +483,36 @@ atom_t *parse_var(struct t_tokenizer *tokenizer, atom_t *prev_arg) {
 }
 
 atom_t *parse_expr(struct t_tokenizer *);
+
+atom_t *parse_import(struct t_tokenizer *tokenizer) {
+    struct t_token *token = *(tokenizer->iter);
+    atom_t *import = new_atom(strdup("import"), A_IMPORT);
+    if (token != NULL && !strcmp(token->value, "from")) {
+        tokenizer->iter++;
+        atom_t *from = parse_var(tokenizer, NULL);
+        add_child_atom(import, from);
+        token = *(tokenizer->iter);
+    }
+    if (token == NULL || (token != NULL && strcmp(token->value, "import"))) {
+        printf("IMPORT import ERROR\n");
+        tokenizer->error = PARSE_ERROR;
+        free_atom_tree(import);
+        return NULL;
+    }
+    token = *(++tokenizer->iter);
+    if (token == NULL || token->type != T_IDENTIFIER) {
+        printf("IMPORT IDENTIFIER ERROR\n");
+        tokenizer->error = PARSE_ERROR;
+        free_atom_tree(import);
+        return NULL;
+    }
+    tokenizer->iter++;
+    atom_t *val = new_atom(strdup(token->value), A_VAR);
+    add_freevar(tokenizer, val);
+    add_child_atom(import, val);
+    return import;
+}
+
 atom_t *parse_yield(struct t_tokenizer *tokenizer) {
     atom_t *yield = new_atom(strdup("yield"), A_YIELD);
     if ((*tokenizer->iter)->type == T_EOL)
@@ -525,12 +556,14 @@ atom_t *parse_callparams(struct t_tokenizer *tokenizer) {
     while (TRUE) {
         token = *tokenizer->iter;
         if (token->type == T_EQUALS) {
+            prev_arg->type = A_KWARG;
             tokenizer->iter++;
             kwargs_start = TRUE;
             atom_t *value = parse_expr(tokenizer);
             if (tokenizer->error == PARSE_ERROR)
                 return NULL;
-            add_child_atom(prev_arg, value);
+            prev_arg->next = value;
+            prev_arg = value;
         } else if (kwargs_start == TRUE) {
             tokenizer->error = PARSE_ERROR;
             free_atom_tree(params);
@@ -1289,10 +1322,8 @@ atom_t *parse_inherits(struct t_tokenizer *tokenizer) {
             printf("PARSE_PARAMS IDENTIRIER ERR\n");
             return NULL;
         }
-        atom_t *param = new_atom(strdup(token->value), A_VAR);
-        get_freevar(tokenizer, param);
+        atom_t *param = parse_var(tokenizer, NULL);
         add_child_atom(params, param);
-        tokenizer->iter++;
         token = *tokenizer->iter;
         if (token == NULL || (token->type != T_COMMA && token->type != T_CPHAR)) {
             tokenizer->error = PARSE_ERROR;
@@ -1403,6 +1434,7 @@ atom_t *parse_func(struct t_tokenizer *tokenizer, int current_indent) {
     atom_t *params = parse_params(tokenizer);
     if (params == NULL || tokenizer->error == PARSE_ERROR) {
         printf("PARSE_FUNC IDENTIFIER ERR\n");
+        tokenizer->error = PARSE_ERROR;
         return NULL;
     }
     struct t_token *column = *tokenizer->iter;
@@ -1523,6 +1555,8 @@ atom_t *parse_stmt(struct t_tokenizer *tokenizer, int current_indent) {
     } else if (!strncmp(token->value, "assert", 6)) {
         tokenizer->iter++;
         stmt = parse_assert(tokenizer);
+    } else if (!strncmp(token->value, "import", 6) || !(strncmp(token->value, "from", 4))) {
+        stmt = parse_import(tokenizer);
     } else if (!strncmp(token->value, "pass", 4)) {
         tokenizer->iter++;
         struct t_token *eol = *tokenizer->iter;
@@ -1963,7 +1997,6 @@ atom_t *parse_try(struct t_tokenizer *tokenizer, int current_indent) {
         return NULL;
     }
     add_child_atom(try, except_block);
-printf("HERE\n");
     return try;
 }
 

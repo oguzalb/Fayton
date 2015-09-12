@@ -21,6 +21,7 @@ char *object_type_name(int type) {
         case SLICE_TYPE: return "SLICE";
         case GENERATORFUNC_TYPE: return "GENERATORFUNC";
         case EXCEPTION_TYPE: return "EXCEPTION";
+        case MODULE_TYPE: return "MODULE";
         default: return "UNDEFINED";
     }
     assert(FALSE);
@@ -83,8 +84,37 @@ void print_var(char* name, object_t* obj) {
         printd("obj %s %s\n", name, object_type_name(obj->type));
 }
 
+object_t *get_builtin(char *name) {
+   return g_hash_table_lookup(interpreter.base_context, name);
+}
+
+object_t *lookup_var(object_t **args, atom_t *var) {
+    object_t *obj = NULL;
+    printd("lookup var cl_index %s %d\n", var->value, var->cl_index);
+    if (var->cl_index == -1) {
+        obj = g_hash_table_lookup(interpreter.base_context, var->value);
+        if (obj == NULL)
+            obj = g_hash_table_lookup(interpreter.globals, var->value);
+        printd("var search from globals %p\n", obj);
+    } else if (args != NULL){
+        obj = args[var->cl_index];
+        printd("var search from locals %p %p\n", obj,args[var->cl_index-1]);
+    }
+    if (obj == NULL) {
+        g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
+        if (var->cl_index == -1) {
+            set_exception("Exception", "Global not found |%s|\n", var->value);
+        } else {
+            set_exception("Exception", "Local not found!!!|%s|\n", var->value);
+        }
+        return NULL;
+    }
+    return obj;
+}
+
+
 object_t *new_class(char* name, object_t **inherits, object_t *(*func)(object_t **, int), int expected_args_count) {
-    object_t *cls = g_hash_table_lookup(interpreter.globals, name);
+    object_t *cls;
     printd("Creating the class %s\n", name);
     cls = new_object(CLASS_TYPE);
     cls->class_props = malloc(sizeof(struct class_type));
@@ -132,30 +162,8 @@ void register_global(char* name, object_t *object) {
     g_hash_table_insert(interpreter.globals, name, object);
 }
 
-void register_builtin_func(char* name, object_t *object) {
-    g_hash_table_insert(interpreter.globals, name, object);
-}
-
-object_t *lookup_var(object_t **args, atom_t *var) {
-    object_t *obj = NULL;
-    printd("lookup var cl_index %s %d arg_alloc %d\n", var->value, var->cl_index, sizeof(args) / sizeof(object_t *));
-    if (var->cl_index == -1) {
-        obj = g_hash_table_lookup(interpreter.globals, var->value);
-        printd("var search from globals\n");
-    } else if (args != NULL){
-        obj = args[var->cl_index];
-        printd("var search from locals\n");
-    }
-    if (obj == NULL) {
-        g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
-        if (var->cl_index == -1) {
-            set_exception("Global not found |%s|\n", var->value);
-        } else {
-            set_exception("Local not found!!!|%s|\n", var->value);
-        }
-        return NULL;
-    }
-    return obj;
+void register_builtin(char* name, object_t *object) {
+    g_hash_table_insert(interpreter.base_context, name, object);
 }
 
 object_t *set_var(object_t **args, atom_t *var, object_t* value) {
@@ -167,19 +175,6 @@ object_t *set_var(object_t **args, atom_t *var, object_t* value) {
 // maybe a length check
         args[var->cl_index] = value;
     }
-}
-object_t *get_global(char*name) {
-    object_t *cls = g_hash_table_lookup(interpreter.globals, name);
-    if (cls == NULL) {
-        g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
-        set_exception("Global not found |%s|\n", name);
-        return NULL;
-    }
-    return cls;
-}
-
-object_t *get_global_no_check(char*name) {
-    return g_hash_table_lookup(interpreter.globals, name);
 }
 
 object_t *new_func(object_t *(*func)(object_t **, int), char *name, int expected_args_count) {
@@ -202,6 +197,18 @@ object_t *new_exception(object_t **args, int count) {
     return exception_obj;
 }
 
+object_t *add_get_module(char* name) {
+    object_t *module = g_hash_table_lookup(interpreter.modules, name);
+    if (module == NULL) {
+        module = new_object(MODULE_TYPE);
+        module->module_props = malloc(sizeof(struct module_type));
+        module->module_props->name = name;
+        module->module_props->tree = new_atom_tree();
+        g_hash_table_insert(interpreter.modules, name, module);
+    }
+    return module;
+}
+
 object_t *exception_str(object_t **args, int count) {
     object_t *self = args[0];
     return object_get_field(self, "message");
@@ -217,11 +224,12 @@ object_t *new_user_func(atom_t *func, char* name, GHashTable *kwargs) {
     return func_obj;
 }
 
-object_t *new_generator_func(atom_t *func, char* name) {
+object_t *new_generator_func(atom_t *func, char* name, GHashTable *kwargs) {
     object_t *func_obj = new_object(GENERATORFUNC_TYPE);
     func_obj->generatorfunc_props = malloc(sizeof(struct generatorfunc_type));
     func_obj->generatorfunc_props->ob_generatorfunc = func;
     func_obj->generatorfunc_props->name = name;
+    func_obj->generatorfunc_props->kwargs = kwargs;
     func_obj->class = NULL;
     return func_obj;
 }
@@ -255,7 +263,7 @@ object_t *range_func(object_t **args) {
     object_t *max = args[1];
     assert(args[2] == NULL);
     if (min->type != INT_TYPE || min->type != INT_TYPE) {
-        set_exception("Range parameters should be integer\n");
+        set_exception("Exception", "Range parameters should be integer\n");
         return NULL;
     }
     object_t *list = new_list(NULL, 0);
@@ -268,11 +276,11 @@ object_t *range_func(object_t **args) {
 
 object_t *assert_func(object_t **args, int count) {
     if (count > 2) {
-        set_exception("assert takes at most 2 arguments");
+        set_exception("AssertionError", "assert takes at most 2 arguments");
         return NULL;
     }
     if (count < 1) {
-        set_exception("assert takes at least 1 arguments");
+        set_exception("AssertionError", "assert takes at least 1 arguments");
         return NULL;
     }
     object_t *expr_result = args[0];
@@ -286,7 +294,7 @@ object_t *assert_func(object_t **args, int count) {
     if (get_exception())
         return NULL;
     if (bool_result->bool_props->ob_bval == FALSE) {
-        set_exception(strdup(message->str_props->ob_sval->str));
+        set_exception("AssertionError", strdup(message->str_props->ob_sval->str));
         return NULL;
     }
     return new_none_internal();
@@ -329,7 +337,7 @@ object_t *isinstance_func(object_t **args, int count) {
 object_t *raise_func(object_t **args, int count) {
     object_t *exception = args[0];
     if (exception->type != EXCEPTION_TYPE) {
-        set_exception("Should be an exception");
+        set_exception("Exception", "Should be an exception");
         return NULL;
     }
     get_thread()->exc = exception;
@@ -363,6 +371,8 @@ void init_interpreter() {
 //   pthread_setspecific(py_thread_key, NULL);
 
     interpreter.globals = g_hash_table_new(g_str_hash, g_str_equal);
+    interpreter.base_context = g_hash_table_new(g_str_hash, g_str_equal);
+    interpreter.modules = g_hash_table_new(g_str_hash, g_str_equal);
     interpreter.threads = g_array_new(TRUE, TRUE, sizeof(struct py_thread *));
     struct py_thread *main_thread = new_thread_struct();
     g_array_append_val(interpreter.threads, main_thread);
@@ -374,13 +384,22 @@ void init_interpreter() {
     
     object_t *exception_class = new_class(strdup("Exception"), NULL, new_exception, 2);
     object_add_field(exception_class, "__str__", new_func(exception_str, strdup("__str__"), 1));
-    register_global(strdup("Exception"), exception_class);
+    register_builtin(strdup("Exception"), exception_class);
+
+    object_t **exc_inherits[2] = {exception_class, NULL};
+    object_t *assert_error_class = new_class(strdup("AssertionError"), exc_inherits, NULL, 2);
+    register_builtin(strdup("AssertionError"), assert_error_class);
+    object_t *import_error_class = new_class(strdup("ImportError"), exc_inherits, NULL, 2);
+    register_builtin(strdup("ImportError"), import_error_class);
+    object_t *type_error_class = new_class(strdup("TypeError"), exc_inherits, NULL, 2);
+    register_builtin(strdup("TypeError"), type_error_class);
+
     init_bool();
     init_none();
     init_slice();
 
-    register_global(strdup("range"), new_func(range_func, strdup("range"), -1));
-    register_global(strdup("sum"), new_func(sum_func, strdup("sum"), 1));
+    register_builtin(strdup("range"), new_func(range_func, strdup("range"), -1));
+    register_builtin(strdup("sum"), new_func(sum_func, strdup("sum"), 1));
 
     init_list();
 
@@ -389,10 +408,10 @@ void init_interpreter() {
     init_thread();
     init_generator();
 
-    register_global(strdup("print"), new_func(print_func, strdup("print"), -1));
-    register_global(strdup("isinstance"), new_func(isinstance_func, strdup("isinstance"), 2));
-    register_global(strdup("raise"), new_func(raise_func, strdup("raise"), 1));
-    register_global(strdup("assert"), new_func(assert_func, strdup("assert"), -1));
+    register_builtin(strdup("print"), new_func(print_func, strdup("print"), -1));
+    register_builtin(strdup("isinstance"), new_func(isinstance_func, strdup("isinstance"), 2));
+    register_builtin(strdup("raise"), new_func(raise_func, strdup("raise"), 1));
+    register_builtin(strdup("assert"), new_func(assert_func, strdup("assert"), -1));
 }
 
 int count_non_global_vars(GHashTable* context) {
@@ -419,11 +438,11 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
     if (interpreter.last_accessed)
         print_var("last", interpreter.last_accessed);
     if (func == NULL) {
-        set_exception("function not found |%s|\n", func_call->value);
+        set_exception("Exception", "function not found |%s|\n", func_call->value);
         return NULL;
     }
     if (func->type != FUNC_TYPE && func->type != USERFUNC_TYPE && func->type != CLASS_TYPE && func->type != GENERATORFUNC_TYPE) {
-        set_exception("OBJ IS NOT CALLABLE %s\n", object_type_name(func->type));
+        set_exception("Exception", "OBJ IS NOT CALLABLE %s\n", object_type_name(func->type));
         return NULL;
     }
     printd("FUNC FOUND |%s|\n", func_call->value);
@@ -435,8 +454,10 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
         print_var("adding instance param class", func);
         self = func;
     } else if (func_call->child->type == A_ACCESSOR && interpreter.last_accessed != NULL) {
-        print_var("adding instance param", interpreter.last_accessed);
-        self = interpreter.last_accessed;
+        if (interpreter.last_accessed->type != MODULE_TYPE) {
+            print_var("adding instance param", interpreter.last_accessed);
+            self = interpreter.last_accessed;
+        }
     }
  
     object_t **inner_args = NULL;
@@ -470,9 +491,9 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
             assert(FALSE);
         if (expected_args_count != -1 && inner_args_count != expected_args_count) {
             if (func->type == FUNC_TYPE) {
-                set_exception("Argument count should be %d for %s, was %d\n", expected_args_count, func->func_props->name, inner_args_count);
+                set_exception("TypeError", "Argument count should be %d for %s, was %d\n", expected_args_count, func->func_props->name, inner_args_count);
             } else if (func->type == CLASS_TYPE) {
-                set_exception("Argument count should be %d for %s, was %d\n", expected_args_count, func->class_props->name, inner_args_count);
+                set_exception("TypeError", "Argument count should be %d for %s, was %d\n", expected_args_count, func->class_props->name, inner_args_count);
             }
             return NULL;
         }
@@ -496,10 +517,16 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
         int param_count = 0;
         atom_t *param_name = func->userfunc_props->ob_userfunc->child->child;
         if (self != NULL) {
+            printd("adding instance param %s\n", param_name->value);
             param_name = param_name->next;
             inner_args[param_count++] = self;
         }
         while (param && param_name && param_name->type == A_VAR) {
+            if (param_name->type != A_VAR) {
+                printd("param type %s\n", object_type_name(param->type));
+                set_exception("TypeError", "Too many params to %s\n", func->userfunc_props->name);
+                return NULL;
+            }
             object_t *value = interpret_expr(param, args, current_indent);
             if (get_exception()) {
                 return NULL;
@@ -510,20 +537,23 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
             param = param->next;
             param_name = param_name->next;
         }
-        if (param != NULL && param_name == NULL) {
-            printd("param type %s\n", object_type_name(param->type));
-            set_exception("Too many params to %s\n", func->userfunc_props->name);
-            return NULL;
-        } else if (param == NULL && param_name != NULL && param_name->type == A_VAR) {
+        if (param != NULL && (param_name == NULL || param_name->type == A_VAR)) {
             printd("param_name %s\n", param_name->value);
-            set_exception("More params needed for %s\n", func->userfunc_props->name);
+            set_exception("TypeError", "More params needed for %s\n", func->userfunc_props->name);
             return NULL;
         }
  
         GHashTable *inner_kwargs = g_hash_table_new(g_str_hash, g_str_equal);
         atom_t *kwarg_name = param_name;
+        while (kwarg_name && kwarg_name->type != A_KWARG)
+            kwarg_name = kwarg_name->next;
         // kwargs without names
-        while (param && (param->type != A_VAR || param->child == NULL) && param_name && param_name->type == A_KWARG) {
+        while (param && param_name && param->type != A_KWARG) {
+            if (param_name->type != A_KWARG) {
+                printd("param type %s\n", object_type_name(param->type));
+                set_exception("TypeError", "Too many params to %s\n", func->userfunc_props->name);
+                return NULL;
+            }
             printd("adding kwarg %s\n", param_name->value);
             object_t *value = interpret_expr(param, args, current_indent);
             if (get_exception()) {
@@ -534,28 +564,34 @@ object_t *interpret_funccall(atom_t *func_call, object_t **args, int current_ind
             param = param->next;
         }
         // kwargs with names
-        while (param) {
-            assert(param->child != NULL);
+        while (param && param->type == A_KWARG) {
             printd("adding named kwarg %s\n", param->value);
-            object_t *value = interpret_expr(param->child, args, current_indent);
+            atom_t *value = param->next;
+            object_t *value_object = interpret_expr(value, args, current_indent);
             if (get_exception()) {
                 return NULL;
             }
-            g_hash_table_insert(inner_kwargs, param->value, value);
-            param = param->next;
+            g_hash_table_insert(inner_kwargs, param->value, value_object);
+            param = value->next;
         }
         inner_args_count = param_count;
         while (kwarg_name && kwarg_name->type == A_KWARG) {
             object_t *value = g_hash_table_lookup(inner_kwargs, kwarg_name->value);
-            if (value == NULL)
-                value = g_hash_table_lookup(func->userfunc_props->kwargs, kwarg_name->value);
-            inner_args[param_count++] = value;
+            if (value != NULL) {
+                printd("adding kwarg %s %p %d\n", kwarg_name->value, value, param_count);
+                inner_args[param_count++] = value;
+            }
             kwarg_name = kwarg_name->next;
         }
         g_hash_table_destroy(inner_kwargs);
         while (param_name && param_name->type == A_KWARG) param_name = param_name->next;
         if (param_name != NULL && param_name->type != A_CLOSURE) {
             assert(FALSE);
+        }
+        if (param != NULL) {
+            printd("param type %s\n", object_type_name(param->type));
+            set_exception("TypeError", "Too many params to %s\n", func->userfunc_props->name);
+            return NULL;
         }
     }
     printd("calling func type %s\n", object_type_name(func->type));
@@ -638,7 +674,7 @@ object_t *interpret_while(atom_t *expr, object_t **args, int current_indent) {
     object_t *ret = NULL;
     while (bool_obj = interpret_expr(condition, args, current_indent)) {
         if (bool_obj->type != BOOL_TYPE) {
-            set_exception("NOT A BOOL TYPE\n");
+            set_exception("Exception", "NOT A BOOL TYPE\n");
             return NULL;
         }
         if (bool_obj->bool_props->ob_bval == FALSE)
@@ -665,7 +701,7 @@ object_t *interpret_if(atom_t *expr, object_t **args, int current_indent) {
             if (get_exception())
                 return NULL;
             if (bool_obj->type != BOOL_TYPE) {
-                set_exception("NOT A BOOL TYPE\n");
+                set_exception("Exception", "NOT A BOOL TYPE\n");
                 return NULL;
             }
             if_block = if_block->next;
@@ -737,7 +773,7 @@ object_t *interpret_expr(atom_t *expr, object_t **args, int current_indent) {
             return NULL;
         return new_bool_from_int(!bool_obj->bool_props->ob_bval);
     } else {
-        set_exception("TYPE INCORRECT %s\n", atom_type_name(expr->type));
+        set_exception("Exception", "TYPE INCORRECT %s\n", atom_type_name(expr->type));
         return NULL;
     }
 }
@@ -764,14 +800,10 @@ void prepare_func_args(object_t *func, object_t **args, int current_indent) {
     }
     printd("Binding kwargs\n");
     while (param_name != NULL && param_name->type == A_KWARG) {
-        printd("Binding default kwarg %s to %d\n", param_name->value, param_index);
         atom_t *value_expr = param_name->child;
         object_t *def_val = interpret_expr(value_expr, args, current_indent);
+        printd("Binding default kwarg %p %s to %d\n", def_val, param_name->value, param_index);
         funcdef->args[param_index++] = def_val;
-        param_name = param_name->next;
-    }
-    while (param_name != NULL && param_name->type == A_KWARG) {
-        param_index++;
         param_name = param_name->next;
     }
     printd("binding closures\n");
@@ -783,6 +815,40 @@ void prepare_func_args(object_t *func, object_t **args, int current_indent) {
         funcdef->args[param_index++] = arg;
         param_name = param_name->next;
     }
+}
+
+object_t *interpret_import(atom_t *stmt, object_t **args, int current_indent) {
+    char *buff;
+    atom_t *module_name = stmt->child;
+    atom_t *from = module_name->next;
+    if (from != NULL) {
+        set_exception("ImportError", "only import identifier works, from not implemented yet\n");
+        return NULL;
+    }
+    asprintf(&buff, "%s.py", module_name->value);
+    FILE *fp = fopen(buff, "r");
+    if (fp == NULL) {
+        set_exception("ImportError", "Couldn't open file %s", buff);
+        free(buff);
+        return NULL;
+    }
+    // TODO checks etc
+    free(buff);
+    object_t *module = add_get_module(module_name->value);
+    set_var(args, module_name, module);
+    GHashTable *interpreter_context = interpreter.globals;
+    interpreter.globals = module->fields;
+    int success = evaluate(fp, module->module_props->tree, FALSE);
+    fclose(fp);
+    interpreter.globals = interpreter_context;
+    if (success == 2) {
+        set_exception("ImportError", "Syntax Error\n");
+        return NULL;
+    }
+    if (success != 0)
+        return NULL;
+    assert(get_exception() == NULL);
+    return NULL;
 }
 
 object_t *interpret_try(atom_t *stmt, object_t **args, int current_indent) {
@@ -809,12 +875,29 @@ object_t *interpret_try(atom_t *stmt, object_t **args, int current_indent) {
     thread->exc = NULL;
     atom_t *as = classes->next;
     atom_t *except_block = as->next;
-// TODO exception types after isinstance gets implemented
     if (as->child)
         set_var(args, as->child, exception);
     object_t *result = interpret_block(except_block, args, current_indent);
 // TODO reraise and/or trace cleanup
     return result;
+}
+
+prepare_funcdef_kwargs(atom_t *param, object_t **args, int current_indent) {
+    GHashTable *kwargs = NULL;
+    while (param && param->child == NULL)
+        param = param->next;
+    if (param != NULL) {
+        kwargs = g_hash_table_new(g_str_hash, g_str_equal);
+        while (param != NULL) {
+            object_t *value = interpret_expr(param->child, args, current_indent);
+            if (get_exception())
+                return NULL;
+            printd("Adding kwarg %s to funcdef", param->value);
+            g_hash_table_insert(kwargs, strdup(param->value), value);
+            param = param->next;
+        }
+    }
+    return kwargs;
 }
 
 object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
@@ -888,14 +971,14 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
                     if (get_exception())
                         return NULL;
                     if (tuple_item_name->type != A_VAR) {
-                        set_exception("recursuve tuple unpack is not implemented yet\n");
+                        set_exception("Exception", "recursuve tuple unpack is not implemented yet\n");
                         return NULL;
                     }
                     set_var(args, tuple_item_name, tuple_item);
                     tuple_item_name = tuple_item_name->next;
                 }
                 if (tuple_item != NULL || tuple_item_name != NULL) {
-                    set_exception("Error while unpacking %p %s\n", tuple_item, tuple_item_name->value);
+                    set_exception("Exception", "Error while unpacking %p %s\n", tuple_item, tuple_item_name->value);
                     return NULL;
                 }
             } else {
@@ -911,29 +994,21 @@ printd("A_IF\n");
         return interpret_if(stmt, args, current_indent);
     } else if (stmt->type == A_TRY) {
         return interpret_try(stmt, args, current_indent);
+    } else if (stmt->type == A_IMPORT) {
+        return interpret_import(stmt, args, current_indent);
     } else if (stmt->type == A_WHILE) {
 printd("A_WHILE\n");
         return interpret_while(stmt, args, current_indent);
     } else if (stmt->type == A_FUNCDEF) {
         atom_t *param = stmt->child->child;
-        GHashTable *kwargs = NULL;
-        while (param && param->child == NULL)
-            param = param->next;
-        if (param != NULL) {
-            kwargs = g_hash_table_new(g_str_hash, g_str_equal);
-            while (param != NULL) {
-                object_t *value = interpret_expr(param->child, args, current_indent);
-                if (get_exception())
-                    return NULL;
-                g_hash_table_insert(kwargs, strdup(param->value), value);
-                param = param->next;
-            }
-        }
+        GHashTable *kwargs = prepare_funcdef_kwargs(param, args, current_indent);
         object_t *userfunc = new_user_func(stmt, strdup(stmt->value), kwargs);
         set_var(args, stmt, userfunc);
         prepare_func_args(userfunc, args, current_indent);
     } else if (stmt->type == A_GENFUNCDEF) {
-        object_t *generatorfunc = new_generator_func(stmt, strdup(stmt->value));
+        atom_t *param = stmt->child->child;
+        GHashTable *kwargs = prepare_funcdef_kwargs(param, args, current_indent);
+        object_t *generatorfunc = new_generator_func(stmt, strdup(stmt->value), kwargs);
         set_var(args, stmt, generatorfunc);
         prepare_func_args(generatorfunc, args, current_indent);
     } else if (stmt->type == A_CLASS) {
@@ -949,9 +1024,11 @@ printd("A_WHILE\n");
             inherits = stmt->child->child;
             int i = 0;
 	    while (inherits != NULL) {
-                object_t *parent_class = lookup_var(args, inherits);
+                object_t *parent_class = interpret_expr(inherits, args, current_indent);
+                if (get_exception())
+                    return NULL;
                 if (parent_class == NULL) {
-                    set_exception("Class does not exist: %s\n", inherits->value);
+                    set_exception("Exception", "Class does not exist: %s\n", inherits->value);
                     return NULL;
                 }
                 param_inherits[i++] = parent_class;
@@ -965,20 +1042,8 @@ printd("A_WHILE\n");
             if (field->type == A_FUNCDEF) {
                 char *trace_str;
                 asprintf(&trace_str, "%s.%s", class_name->value, field->value);
-
                 atom_t *param = stmt->child->child;
-                GHashTable *kwargs = NULL;
-                while (param && param->child == NULL)
-                    param = param->next;
-                if (param != NULL) {
-                    kwargs = g_hash_table_new(g_str_hash, g_str_equal);
-                    while (param != NULL && param->child != NULL) {
-                        object_t *value = interpret_expr(param->child, args, current_indent);
-                       if (get_exception())
-                            return NULL;
-                        g_hash_table_insert(kwargs, param->value, value);
-                    }
-                }
+                GHashTable *kwargs = prepare_funcdef_kwargs(param, args, current_indent);
                 object_t *userfunc = new_user_func(field, trace_str, kwargs);
                 object_add_field(class, field->value, userfunc);
                 printd("added class field func %s.%s\n", class_name->value, field->value);
@@ -986,7 +1051,9 @@ printd("A_WHILE\n");
             } else if (field->type == A_GENFUNCDEF) {
                 char *trace_str;
                 asprintf(&trace_str, "%s.%s", class_name->value, field->value);
-                object_t *generatorfunc = new_generator_func(field, trace_str);
+                atom_t *param = stmt->child->child;
+                GHashTable *kwargs = prepare_funcdef_kwargs(param, args, current_indent);
+                object_t *generatorfunc = new_generator_func(field, trace_str, kwargs);
                 object_add_field(class, field->value, generatorfunc);
                 prepare_func_args(generatorfunc, args, current_indent);
             } else if (field->type == A_VAR) {
@@ -1024,7 +1091,7 @@ printd("A_WHILE\n");
         g_mutex_unlock(mutex);
         printd("passed yield wait (gen thread)\n");
     } else {
-        set_exception("UNKNOWN ATOM %s\n", atom_type_name(stmt->type));
+        set_exception("Exception", "UNKNOWN ATOM %s\n", atom_type_name(stmt->type));
         return NULL;
     }
     return NULL;
@@ -1035,7 +1102,7 @@ object_t *interpret_block(atom_t *block, object_t **args, int current_indent) {
     interpreter.error = 0;
     printd("interpreting block\n");
     if (block->type != A_BLOCK) {
-        set_exception("NOT A BLOCK\n");
+        set_exception("Exception", "NOT A BLOCK\n");
         return NULL;
     }
     atom_t *stmt = block->child;
@@ -1067,3 +1134,44 @@ object_t *interpret_funcblock(atom_t *block, object_t **args, int current_indent
     return result != NULL? result : new_none_internal();
 }
 
+int evaluate(FILE *stream, atom_tree_t *tree, int is_repl) {
+    struct t_tokenizer *tokenizer = new_tokenizer(is_repl);
+    int success = tokenize_stream(stream, tree, tokenizer);
+    if (tokenizer->error == PARSE_ERROR) {
+        printf("Syntax error at line:%d\n", tokenizer->current_line);
+        free_tokenizer(tokenizer);
+        return 2;
+    }
+    // fclose(stream);
+    tree->root = parse_block(tokenizer, -1);
+    if (tokenizer->error == PARSE_ERROR) {
+        printf("Syntax error at line:%d %s\n", tokenizer->current_line, (*tokenizer->iter)==NULL?"":(*tokenizer->iter)->value);
+        free_tokenizer(tokenizer);
+        return 2;
+    }
+    free_tokenizer(tokenizer);
+    // this is for showing what we get as the ast tree, we won't have this when it is finished
+    char *buff = NULL;
+    print_atom(tree->root, &buff, 0, FALSE);
+    printf("%s\n", buff);
+    printd("interpreting\n");
+    interpret_block(tree->root, NULL, 0);
+    return get_exception() != NULL;
+}
+
+int evaluate_main(FILE *stream, atom_tree_t *tree, int is_repl) {
+   int success = evaluate(stream, tree, is_repl);
+   if (success == 2)
+       return 1;
+   object_t *exception;
+   if (exception = get_exception()) {
+        clear_exception();
+        struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
+        print_stack_trace(exception);
+        g_array_free(main_thread->stack_trace, FALSE);
+        main_thread->stack_trace = g_array_new(TRUE, TRUE, sizeof(char *));
+// TODO free also others
+        return 1;
+    }
+    return 0;
+}

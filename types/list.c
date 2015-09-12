@@ -39,7 +39,7 @@ object_t *list_insert(object_t **args, int count) {
     object_t *index = args[1];
     object_t *item = args[2];
     if (index->type != INT_TYPE) {
-        set_exception("Second type is not int");
+        set_exception("Exception", "Second type is not int");
         return NULL;
     }
     int i = index->int_props->ob_ival;
@@ -56,7 +56,7 @@ object_t *list_extend(object_t **args, int count) {
     GArray *list2_ob_aval = list2->list_props->ob_aval;
     GArray *list_ob_aval = list->list_props->ob_aval;
     if (list2->type != LIST_TYPE) {
-        set_exception("Second type is not list");
+        set_exception("Exception", "Second type is not list");
         return NULL;
     }
     for (int i=0; g_array_index(list2_ob_aval, object_t*, i) != NULL; i++)
@@ -109,7 +109,7 @@ object_t *list_add(object_t **args, int count) {
     object_t *list3 = new_list_internal();
     assert(list->type == LIST_TYPE);
     if (list2->type != LIST_TYPE) {
-        set_exception("Second type is not list");
+        set_exception("Exception", "Second type is not list");
         return NULL;
     }
     object_t **list_iter = get_garray_begin(list->list_props->ob_aval);
@@ -127,7 +127,7 @@ object_t *list_pop(object_t **args, int count) {
     GArray *self_ob_aval = self->list_props->ob_aval;
 // Throw IndexError
     if (self_ob_aval->len == 0) {
-        set_exception("IndexError");
+        set_exception("Exception", "IndexError");
         return NULL;
     }
     object_t *last = g_array_index(self_ob_aval, object_t*, self_ob_aval->len-1);
@@ -145,7 +145,7 @@ object_t *new_listiterator_internal(object_t *list) {
     object_t *listiterator = new_object(LISTITERATOR_TYPE);
     listiterator->listiterator_props = malloc(sizeof(struct listiterator_type));
     listiterator->listiterator_props->objectp = get_garray_begin(list->list_props->ob_aval);
-    listiterator->class = get_global("listiterator");
+    listiterator->class = get_builtin("listiterator");
     assert(listiterator->class != NULL);
     printd("created list iterator\n");
     return listiterator;
@@ -156,11 +156,11 @@ object_t *list_setitem(object_t **args, int count) {
     object_t *index = args[1];
     object_t *item = args[2];
     if (index->type != INT_TYPE) {
-        set_exception("Type should be int\n");
+        set_exception("Exception", "Type should be int\n");
         return NULL;
     }
     if (index->int_props->ob_ival >= self->list_props->ob_aval->len) {
-        set_exception("index bigger than list size\n");
+        set_exception("Exception", "index bigger than list size\n");
         return NULL;
     }
     int len = self->list_props->ob_aval->len;
@@ -168,7 +168,7 @@ object_t *list_setitem(object_t **args, int count) {
     if (i < 0) {
         i = len + i;
         if (i < 0) {
-            set_exception("index out of range\n");
+            set_exception("Exception", "index out of range\n");
             return NULL;
         }
     }
@@ -187,13 +187,13 @@ object_t *list_getitem(object_t **args, int count) {
             i += len;
         }
         if (i < 0 || i >= len) {
-            set_exception("index out of range\n");
+            set_exception("Exception", "index out of range\n");
             return NULL;
         }
         return g_array_index(list->list_props->ob_aval, object_t *, i);
     }
     if (slice->type != SLICE_TYPE) {
-        set_exception("Type should be int or slice\n");
+        set_exception("Exception", "Type should be int or slice\n");
         return NULL;
     }
     if (list->list_props->ob_aval->len == 0)
@@ -225,7 +225,7 @@ object_t *list_getitem(object_t **args, int count) {
 object_t *new_list_internal() {
     object_t* list = new_object(LIST_TYPE);
     list->list_props = malloc(sizeof(struct list_type));
-    list->class = get_global("list");
+    list->class = get_builtin("list");
     list->list_props->ob_aval = g_array_new(TRUE, TRUE, sizeof(object_t *));
     return list;
 }
@@ -254,7 +254,7 @@ object_t *list_repr(object_t **args, int count) {
 
 object_t *new_list(object_t **args, int count) {
     if (count > 2) {
-        set_exception("list takes at most two arguments\n");
+        set_exception("Exception", "list takes at most two arguments\n");
         return NULL;
     }
     object_t *list;
@@ -263,7 +263,7 @@ object_t *new_list(object_t **args, int count) {
         list = args[1]; 
         if (list->type != LIST_TYPE) {
             // TODO should be iterable
-            set_exception("list takes list as an argument\n");
+            set_exception("Exception", "list takes list as an argument\n");
             return NULL;
         }
     } else
@@ -274,7 +274,7 @@ object_t *new_list(object_t **args, int count) {
 void init_list() {
     object_t *listiterator_class = new_class(strdup("listiterator"), NULL, new_listiterator, 2);
     object_add_field(listiterator_class, "next", new_func(listiterator_next, strdup("next"), 1));
-    register_global(strdup("listiterator"), listiterator_class);
+    register_builtin(strdup("listiterator"), listiterator_class);
     
     object_t *list_class = new_class(strdup("list"), NULL, new_list, -1);
     object_add_field(list_class, "__iter__", new_func(list_iter, strdup("__iter__"), 1));
@@ -289,5 +289,5 @@ void init_list() {
     object_add_field(list_class, "__len__", new_func(list_len, strdup("__len__"), 1));
     object_add_field(list_class, "pop", new_func(list_pop, strdup("pop"), 1));
     object_add_field(list_class, "reverse", new_func(list_reverse, strdup("reverse"), 1));
-    register_global(strdup("list"), list_class);
+    register_builtin(strdup("list"), list_class);
 }

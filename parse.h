@@ -57,6 +57,7 @@
 #define A_NOT 38
 #define A_KWARG 39
 #define A_TRY 40
+#define A_IMPORT 41
 
 typedef struct _atom_t {
     char *value;

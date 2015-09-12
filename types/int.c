@@ -4,7 +4,7 @@ object_t *int_sub(object_t **args, int count) {
     object_t *left = args[0];
     object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        set_exception("Both parameters should be integer\n");
+        set_exception("Exception", "Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival - right->int_props->ob_ival);
@@ -12,12 +12,12 @@ object_t *int_sub(object_t **args, int count) {
 
 object_t *int_add(object_t **args, int count) {
     if (args_len(args) != 2) {
-        set_exception("Needs two integer arguments\n");
+        set_exception("Exception", "Needs two integer arguments\n");
     }
     object_t *left = args[0];
     object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        set_exception("Both parameters should be integer\n");
+        set_exception("Exception", "Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival + right->int_props->ob_ival);
@@ -27,7 +27,7 @@ object_t *int_mul(object_t **args, int count) {
     object_t *left = args[0];
     object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        set_exception("Both parameters should be integer\n");
+        set_exception("Exception", "Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival * right->int_props->ob_ival);
@@ -37,7 +37,7 @@ object_t *int_div(object_t **args, int count) {
     object_t *left = args[0];
     object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        set_exception("Both parameters should be integer\n");
+        set_exception("Exception", "Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival / right->int_props->ob_ival);
@@ -47,7 +47,7 @@ object_t *int_mod(object_t **args, int count) {
     object_t *left = args[0];
     object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        set_exception("Both parameters should be integer\n");
+        set_exception("Exception", "Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival % right->int_props->ob_ival);
@@ -58,7 +58,7 @@ object_t *int_cmp(object_t **args, int count) {
     object_t *left = args[0];
     object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        set_exception("Both parameters should be integer\n");
+        set_exception("Exception", "Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival > right->int_props->ob_ival? 1:left->int_props->ob_ival == right->int_props->ob_ival?0:-1);
@@ -68,7 +68,7 @@ object_t *int_rshift(object_t **args, int count) {
     object_t *left = args[0];
     object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        set_exception("Both parameters should be integer\n");
+        set_exception("Exception", "Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival >> right->int_props->ob_ival);
@@ -78,7 +78,7 @@ object_t *int_lshift(object_t **args, int count) {
     object_t *left = args[0];
     object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        set_exception("Both parameters should be integer\n");
+        set_exception("Exception", "Both parameters should be integer\n");
         return NULL;
     }
     return new_int_internal(left->int_props->ob_ival << right->int_props->ob_ival);
@@ -88,7 +88,7 @@ object_t *int_equals(object_t **args, int count) {
     object_t *left = args[0];
     object_t *right = args[1];
     if (left->type != INT_TYPE || right->type != INT_TYPE) {
-        set_exception("Both parameters should be integer\n");
+        set_exception("Exception", "Both parameters should be integer\n");
         return NULL;
     }
     return new_bool_from_int(left->int_props->ob_ival == right->int_props->ob_ival);
@@ -111,7 +111,7 @@ object_t *new_int(object_t **args, int count) {
     printd("NEW INT\n");
     object_t *int_obj = args[1];
     if (int_obj->type != INT_TYPE) {
-        set_exception("Parameter should be integer\n");
+        set_exception("Exception", "Parameter should be integer\n");
         return NULL;
     }
     return int_obj;
@@ -120,7 +120,7 @@ object_t *new_int(object_t **args, int count) {
 object_t *new_int_internal(int value) {
     object_t *int_obj = new_object(INT_TYPE);
     int_obj->int_props = malloc(sizeof(struct int_type));
-    int_obj->class = get_global("int");
+    int_obj->class = get_builtin("int");
     int_obj->int_props->ob_ival = value;
     return int_obj;
 }
@@ -138,5 +138,5 @@ void init_int() {
     object_add_field(int_class, "__eq__", new_func(int_equals, strdup("__eq__"), 2));
     object_add_field(int_class, "__hash__", new_func(int_hash, strdup("__hash__"), 1));
     object_add_field(int_class, "__repr__", new_func(int_repr, strdup("__repr__"), 1));
-    register_global(strdup("int"), int_class);
+    register_builtin(strdup("int"), int_class);
 }

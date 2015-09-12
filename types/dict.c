@@ -56,7 +56,7 @@ object_t *dict_repr(object_t **args, int count) {
 
 object_t *dict_get(object_t **args, int count) {
     if (count != 2 && count != 3) {
-        set_exception("Two/Three arguments expected\n");
+        set_exception("Exception", "Two/Three arguments expected\n");
         return NULL;
     }
     object_t *self = args[0];
@@ -70,7 +70,7 @@ object_t *dict_getitem(object_t **args, int count) {
     if (get_exception())
         return NULL;
     if (value == NULL || value->type == NONE_TYPE) {
-        set_exception("KeyError");
+        set_exception("Exception", "KeyError");
         return NULL;
     }
     return value;
@@ -127,12 +127,12 @@ object_t *dict_equals(object_t **args, int count) {
 
 object_t *new_dict(object_t **args, int count) {
     if (count > 1) {
-        set_exception("dict from iterable not implemented yet\n");
+        set_exception("Exception", "dict from iterable not implemented yet\n");
         return NULL;
     }
     // TODO args check
     object_t * dict = new_object(DICTIONARY_TYPE);
-    dict->class = get_global("dict");
+    dict->class = get_builtin("dict");
     dict->dict_props = malloc(sizeof(struct list_type));
     dict->dict_props->ob_dval = g_hash_table_new(object_hash, object_equal);
     return dict;
@@ -148,5 +148,5 @@ void init_dict() {
     object_add_field(dict_class, "__setitem__", new_func(dict_setitem, strdup("__setitem__"), 3));
     object_add_field(dict_class, "__repr__", new_func(dict_repr, strdup("__repr__"), 1));
     object_add_field(dict_class, "__eq__", new_func(dict_equals, strdup("__eq__"), 2));
-    register_global(strdup("dict"), dict_class);
+    register_builtin(strdup("dict"), dict_class);
 }

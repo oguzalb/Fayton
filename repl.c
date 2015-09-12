@@ -47,41 +47,6 @@ char *read_input() {
     return input;
 }
 
-int evaluate(FILE *stream, atom_tree_t *tree, int is_repl) {
-    struct t_tokenizer *tokenizer = new_tokenizer(is_repl);
-    int success = tokenize_stream(stream, tree, tokenizer);
-    if (tokenizer->error == PARSE_ERROR) {
-        printf("Syntax error at line:%d\n", tokenizer->current_line);
-        free_tokenizer(tokenizer);
-        return 1;
-    }
-    // fclose(stream);
-    tree->root = parse_block(tokenizer, -1);
-    if (tokenizer->error == PARSE_ERROR) {
-        printf("Syntax error at line:%d %s\n", tokenizer->current_line, (*tokenizer->iter)==NULL?"":(*tokenizer->iter)->value);
-        free_tokenizer(tokenizer);
-        return 1;
-    }
-    free_tokenizer(tokenizer);
-    // this is for showing what we get as the ast tree, we won't have this when it is finished
-    char *buff = NULL;
-    print_atom(tree->root, &buff, 0, FALSE);
-    printf("%s\n", buff);
-    printd("interpreting\n");
-    interpret_block(tree->root, interpreter.globals, 0);
-    object_t *exception;
-    if (exception = get_exception()) {
-        clear_exception();
-        struct py_thread *main_thread = g_array_index(interpreter.threads, struct py_thread *,0);
-        print_stack_trace(exception);
-        g_array_free(main_thread->stack_trace, FALSE);
-        main_thread->stack_trace = g_array_new(TRUE, TRUE, sizeof(char *));
-// TODO free also others
-        return 1;
-    }
-    return 0;
-}
-
 void repl_loop() {
     char* input;
     FILE *stream;
@@ -93,7 +58,7 @@ void repl_loop() {
         atom_tree_t *tree = new_atom_tree();
         g_array_append_val(trees, tree);
         stream = fmemopen(input, strlen(input), "r");
-        evaluate(stream, tree, TRUE);
+        evaluate_main(stream, tree, TRUE);
         free(input);
         g_hash_table_foreach(interpreter.globals, print_var_each, NULL);
     }
@@ -108,9 +73,13 @@ void repl_loop() {
 
 int interpret_main(char* filename) {
     FILE *fp = fopen(filename, "r");
+    if (fp == NULL) {
+        printf("No file named %s", filename);
+        return 1;
+    }
 // TODO check file etc
     atom_tree_t *tree = new_atom_tree();
-    int result = evaluate(fp, tree, FALSE);
+    int result = evaluate_main(fp, tree, FALSE);
     fclose(fp);
     free(tree);
     return result;

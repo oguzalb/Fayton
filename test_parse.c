@@ -717,6 +717,18 @@ except Exception as e:\n\
         VAR:print:-1\n\
         PARAMS:params\n\
           INTEGER:2\n", &tree);
+     test_parse_block("import itertools",
+"BLOCK:block\n\
+  IMPORT:import\n\
+    VAR:itertools:-1\n", &tree);
+     test_parse_block("from django.contrib import something",
+"BLOCK:block\n\
+  IMPORT:import\n\
+    ACCESSOR:.\n\
+      VAR:django:-1\n\
+      VAR:contrib:-1\n\
+    VAR:something:-1\n", &tree);
+ 
     //fclose(stream);
     return 0;
     //fclose(fp);

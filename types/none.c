@@ -1,7 +1,7 @@
 #include "none.h"
 
 object_t *new_none_internal() {
-    object_t *none_obj = get_global_no_check("None");
+    object_t *none_obj = get_builtin("None");
     printd("\'RETURNING\' NONE\n");
     return none_obj;
 }
@@ -21,5 +21,5 @@ void init_none() {
     object_t *none_class = new_class(strdup("NoneType"), NULL, NULL, 0);
     none_instance->class = none_class;
     object_add_field(none_class, "__repr__", new_func(none_repr_func, strdup("__repr__"), 1));
-    register_global(strdup("None"), none_instance);
+    register_builtin(strdup("None"), none_instance);
 }

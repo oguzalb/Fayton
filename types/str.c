@@ -31,7 +31,7 @@ object_t *str_equals(object_t **args, int count) {
 
 object_t *str_format(object_t **args, int count) {
     if (count > 3) {
-        set_exception("More than one format argument not supported yet\n");
+        set_exception("Exception", "More than one format argument not supported yet\n");
         return NULL;
     }
     object_t *self = args[0];
@@ -51,8 +51,13 @@ object_t *str_format(object_t **args, int count) {
             end++;
             if (*end == 's') {
                 if (arg == arg_boundary) {
-                    set_exception("more args needed\n");
+                    set_exception("Exception", "more args needed\n");
                     return NULL;
+                }
+                if ((*arg)->type != STR_TYPE) {
+                    *arg = object_call_str(*arg);
+                    if (get_exception())
+                        return NULL;
                 }
                 char *str = (*arg)->str_props->ob_sval->str;
                 int str_len = strlen(str);
@@ -76,7 +81,7 @@ object_t *str_format(object_t **args, int count) {
         }
     }
     if (arg != arg_boundary) {
-        set_exception("too many arguments\n");
+        set_exception("Exception", "too many arguments\n");
         return NULL;
     }
     return new_str_internal(dst);
@@ -98,7 +103,7 @@ object_t *str_getitem(object_t **args, int count) {
             i += len;
         }
         if (i < 0 || i >= len) {
-            set_exception("index out of range\n");
+            set_exception("Exception", "index out of range\n");
             return NULL;
         }
         char buff[2];
@@ -109,7 +114,7 @@ object_t *str_getitem(object_t **args, int count) {
     if (str->str_props->ob_sval->len == 0)
         return new_str_internal(NULL);
     if (slice->type != SLICE_TYPE) {
-        set_exception("Type should be int or slice\n");
+        set_exception("Exception", "Type should be int or slice\n");
         return NULL;
     }
     printd("Creating slice string\n");
@@ -138,7 +143,7 @@ object_t *str_getitem(object_t **args, int count) {
 
 object_t *new_str_internal(char* value) {
     object_t *str_obj = new_object(STR_TYPE);
-    str_obj->class = get_global("str");
+    str_obj->class = get_builtin("str");
     str_obj->str_props = malloc(sizeof(struct str_type));
     str_obj->str_props->ob_sval = g_string_new(value);
     printd("NEW STR %s\n", str_obj->str_props->ob_sval->str);
@@ -153,5 +158,5 @@ void init_str() {
     object_add_field(str_class, "__mod__", new_func(str_format, strdup("__mod__"), 2));
     object_add_field(str_class, "__hash__", new_func(str_hash, strdup("__hash__"), 1));
     object_add_field(str_class, "__getitem__", new_func(str_getitem, strdup("__getitem__"), 2));
-    register_global(strdup("str"), str_class);
+    register_builtin(strdup("str"), str_class);
 }

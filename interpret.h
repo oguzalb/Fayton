@@ -24,6 +24,7 @@
 #define SLICE_TYPE 13
 #define GENERATORFUNC_TYPE 14
 #define EXCEPTION_TYPE 15
+#define MODULE_TYPE 16
 
 pthread_key_t py_thread_key;
 
@@ -77,6 +78,7 @@ struct generatorfunc_type {
     GMutex *mutex;
     struct _object *channel;
     char *name;
+    GHashTable *kwargs;
 };
 
 struct class_type {
@@ -97,6 +99,11 @@ struct exception_type {
     struct py_thread *thread;
 };
 
+struct module_type {
+    char *name;
+    atom_tree_t *tree;
+};
+
 typedef struct _object {
     int type;
     struct _object *class;
@@ -115,6 +122,7 @@ typedef struct _object {
         struct listiterator_type *listiterator_props;
         struct slice_type *slice_props;
         struct exception_type *exception_props;
+        struct module_type *module_props;
     };
 } object_t;
 
@@ -133,8 +141,10 @@ struct py_thread {
 struct _interpreter {
     int error;
     object_t *last_accessed;
+    GHashTable *base_context;
     GHashTable *globals;
     GArray *threads;
+    GHashTable *modules;
 } interpreter;
 
 void print_var_each(gpointer, gpointer, gpointer);
@@ -143,14 +153,15 @@ object_t *interpret_funcblock(atom_t *, object_t **, int);
 void init_interpreter();
 object_t *new_func(object_t *(*)(object_t **, int), char *, int);
 void register_global(char*, object_t *);
-object_t *get_global(char*);
-object_t *get_global_no_check(char*);
+object_t *get_builtin(char*);
 object_t *new_class(char*, object_t **, object_t *(*)(object_t **, int), int);
 object_t *new_exception(object_t **, int);
 int args_len(object_t **args);
 void print_var(char*, object_t*);
-#define set_exception(fmt, args...) \
-    {char *msg; struct py_thread *mt = get_thread(); asprintf(&msg, fmt, ##args); object_t *params[2] = {get_global("Exception"), new_str_internal(msg)}; mt->exc = new_exception(params, 2);}
+int evaluate(FILE *stream, atom_tree_t *tree, int is_repl);
+int evaluate_main(FILE *stream, atom_tree_t *tree, int is_repl);
+#define set_exception(type, fmt, args...) \
+    {char *msg; struct py_thread *mt = get_thread(); asprintf(&msg, fmt, ##args); object_t *params[2] = {get_builtin(type), new_str_internal(msg)}; mt->exc = new_exception(params, 2);}
 
 #define get_exception() get_thread()->exc
 #define clear_exception() {get_thread()->exc = NULL;}

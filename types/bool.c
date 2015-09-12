@@ -1,7 +1,7 @@
 #include "bool.h"
 
 object_t *new_bool_from_int(int value) {
-    object_t *bool_obj = get_global_no_check(value != 0 ? "True":"False");
+    object_t *bool_obj = get_builtin(value != 0 ? "True":"False");
     if (bool_obj == NULL) {
         bool_obj = new_object(BOOL_TYPE);
         bool_obj->bool_props = malloc(sizeof(struct bool_type));
@@ -26,7 +26,7 @@ object_t *new_bool_internal(object_t *object) {
         return new_bool_from_int(g_hash_table_size(object->dict_props->ob_dval));
     } else {
 // TODO implement non_zeros
-        set_exception("NOT boolABLE ( : %s\n", object_type_name(object->type));
+        set_exception("Exception", "NOT boolABLE ( : %s\n", object_type_name(object->type));
         return NULL;
     }
 }
@@ -60,15 +60,15 @@ void init_bool() {
     object_t *bool_class = new_class(strdup("bool"), NULL, new_bool, 2);
     object_add_field(bool_class, "__eq__", new_func(object_equals, strdup("__eq__"), 2));
     object_add_field(bool_class, "__repr__", new_func(bool_repr_func, strdup("__repr__"), 1));
-    register_global(strdup("bool"), bool_class);
+    register_builtin(strdup("bool"), bool_class);
 
     object_t *true_int = new_int_internal(TRUE);
     object_t *true_instance = new_bool_internal(true_int);
     true_instance->class = bool_class;
-    register_global(strdup("True"), true_instance);
+    register_builtin(strdup("True"), true_instance);
 
     object_t *false_int = new_int_internal(FALSE);
     object_t *false_instance = new_bool_internal(false_int);
     false_instance->class = bool_class;
-    register_global(strdup("False"), false_instance);
+    register_builtin(strdup("False"), false_instance);
 }

@@ -14,7 +14,7 @@ gboolean object_equal(gconstpointer a, gconstpointer b) {
     if (get_exception())
         return FALSE;
     if (res->type != BOOL_TYPE) {
-        set_exception("__eq__ should return bool type");
+        set_exception("Exception", "__eq__ should return bool type");
         return FALSE;
     }
     return res->bool_props->ob_bval;
@@ -47,7 +47,7 @@ object_t *new_object_instance(object_t **args, int count) {
         args[0] = object;
         object_t *result = object_call_func_obj(init_func, args, count);
         if (result != new_none_internal()) {
-            set_exception("__init__() should return None");
+            set_exception("Exception", "__init__() should return None");
             return NULL;
         }
     }
@@ -61,7 +61,7 @@ object_t *object_call_func_obj(object_t *func, object_t **param_objs, int count)
     } else if (func->type == FUNC_TYPE) {
         result = func->func_props->ob_func(param_objs, count);
     } else {
-        set_exception("field should be a function.");
+        set_exception("Exception", "field should be a function.");
         return NULL;
     }
     return result;
@@ -87,7 +87,7 @@ object_t *object_call_repr(object_t *object) {
     if (get_exception())
         return NULL;
     if (item_str->type != STR_TYPE) {
-        set_exception("__repr__ should be a function returning string");
+        set_exception("Exception", "__repr__ should be a function returning string");
         return NULL;
     }
     return item_str;
@@ -134,7 +134,7 @@ object_t *object_call_str(object_t *object) {
     if (get_exception())
         return NULL;
     if (item_str->type != STR_TYPE) {
-        set_exception("__str__ should be a function returning string");
+        set_exception("Exception", "__str__ should be a function returning string");
         return NULL;
     }
     return item_str;
@@ -202,7 +202,7 @@ object_t *object_get_field_no_check(object_t *object, char* name) {
 object_t *object_get_field(object_t *object, char *name) {
     object_t *field = object_get_field_no_check(object, name);
     if (field == NULL) {
-        set_exception("Field not found %s\n", name);
+        set_exception("Exception", "Field not found %s\n", name);
         return NULL;
     }
     return field;
@@ -219,5 +219,5 @@ void init_object() {
     object_add_field(object_class, "__and__", new_func(object_and, strdup("__and__"), 2));
     object_add_field(object_class, "__or__", new_func(object_or, strdup("__or__"), 2));
     object_add_field(object_class, "__repr__", new_func(object_repr, strdup("__repr__"), 1));
-    register_global(strdup("object"), object_class);
+    register_builtin(strdup("object"), object_class);
 }
