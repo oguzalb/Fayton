@@ -96,7 +96,7 @@ object_t *object_call_repr(object_t *object) {
 object_t *object_repr(object_t **args, int count) {
     char* str;
     object_t *self = args[0];
-    asprintf(&str, "< %s instance %p >", self->class_props->name, self);
+    asprintf(&str, "<%s instance at %p>", self->class->class_props->name, self);
     return new_str_internal(str);
 }
 

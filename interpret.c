@@ -198,13 +198,14 @@ object_t *add_get_module(char* name) {
     return module;
 }
 
+struct object_t *function_class = NULL;
 object_t *new_user_func(atom_t *func, char* name, GHashTable *kwargs) {
     object_t *func_obj = new_object(USERFUNC_TYPE);
     func_obj->userfunc_props = malloc(sizeof(struct userfunc_type));
     func_obj->userfunc_props->ob_userfunc = func;
     func_obj->userfunc_props->name = name;
     func_obj->userfunc_props->kwargs = kwargs;
-    func_obj->class = NULL;
+    func_obj->class = function_class;
     return func_obj;
 }
 
@@ -284,6 +285,15 @@ object_t *assert_func(object_t **args, int count) {
     return new_none_internal();
 }
 
+object_t *type_func(object_t **args, int count) {
+    object_t *object = args[0];
+    if (object->class == NULL) {
+        set_exception("NotImplementedError", "This object does not have a class, types will be fixed later\n");
+        return NULL;
+    }
+    return new_str_internal(object->class->class_props->name);
+}
+
 object_t *print_func(object_t **args, int count) {
     for (int i=0; i < count; i++) {
         object_t *obj_str = object_call_str(args[i]);
@@ -335,8 +345,8 @@ struct py_thread *new_thread_struct() {
 }
 
 void local_storage_destructor(int *value) {
+    // TODO consider
 }
-
 
 void init_interpreter() {
     interpreter.error = 0;
@@ -370,6 +380,8 @@ void init_interpreter() {
     init_none();
     init_slice();
 
+    function_class = new_class(strdup("function"), NULL, NULL, 0);
+
     register_builtin(strdup("range"), new_func(range_func, strdup("range"), -1));
     register_builtin(strdup("sum"), new_func(sum_func, strdup("sum"), 1));
 
@@ -384,6 +396,7 @@ void init_interpreter() {
     register_builtin(strdup("isinstance"), new_func(isinstance_func, strdup("isinstance"), 2));
     register_builtin(strdup("raise"), new_func(raise_func, strdup("raise"), 1));
     register_builtin(strdup("assert"), new_func(assert_func, strdup("assert"), -1));
+    register_builtin(strdup("type"), new_func(type_func, strdup("type"), 1));
 }
 
 int count_non_global_vars(GHashTable* context) {
@@ -794,7 +807,7 @@ object_t *interpret_import(atom_t *stmt, object_t **args, int current_indent) {
     atom_t *module_name = stmt->child;
     atom_t *from = module_name->next;
     if (from != NULL) {
-        set_exception("ImportError", "only import identifier works, from not implemented yet\n");
+        set_exception("NotImplementedError", "only import identifier works, from not implemented yet\n");
         return NULL;
     }
     asprintf(&buff, "%s.py", module_name->value);
@@ -943,7 +956,7 @@ object_t *interpret_stmt(atom_t *stmt, object_t **args, int current_indent) {
                     if (get_exception())
                         return NULL;
                     if (tuple_item_name->type != A_VAR) {
-                        set_exception("Exception", "recursuve tuple unpack is not implemented yet\n");
+                        set_exception("NotImplementedError", "recursuve tuple unpack is not implemented yet\n");
                         return NULL;
                     }
                     set_var(args, tuple_item_name, tuple_item);
